@@ -86,14 +86,9 @@ const ProductPicker = ({
       }
       renderOption={(props, option) => (
         <Box component="li" {...props} key={option.gid}>
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {option.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {option.gid}
-            </Typography>
-          </Box>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {option.name}
+          </Typography>
         </Box>
       )}
       renderInput={(params) => {

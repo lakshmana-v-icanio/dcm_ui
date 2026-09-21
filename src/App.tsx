@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import AppLayout from './components/layout/AppLayout';
+import ConfirmDialog from './components/common/ConfirmDialog';
 import ScheduleList from './screens/ScheduleList';
 import ScheduleWizard from './screens/wizard/ScheduleWizard';
 import type { PcScheduleDto } from './api/pcSchedule';
@@ -29,11 +30,18 @@ const Placeholder = ({ label }: { label: string }) => (
 // 'wizard' covers both flows: creating a new schedule and resuming an existing one.
 type ScheduleMode = 'list' | 'wizard';
 
+const CLASSIFY_LEAVE_MESSAGE =
+  'AI Variable Classification is in progress. If you leave now the process may be interrupted. Leave anyway?';
+
 function App() {
   const [active, setActive] = useState('schedules');
   const [mode, setMode] = useState<ScheduleMode>('list');
   const [selectedSchedule, setSelectedSchedule] = useState<PcScheduleDto | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // True while the wizard's AI classification is running — guards side navigation.
+  const [classifying, setClassifying] = useState(false);
+  // Nav key deferred until the user confirms the "leave while classifying" popup.
+  const [pendingNavKey, setPendingNavKey] = useState<string | null>(null);
 
   const meta = useMemo(() => {
     if (active !== 'schedules') return TITLES[active] ?? TITLES.schedules;
@@ -54,10 +62,20 @@ function App() {
     return TITLES.schedules;
   }, [active, mode, selectedSchedule]);
 
-  const handleSelectNav = (key: string) => {
+  const doSelectNav = (key: string) => {
+    setClassifying(false);
     setActive(key);
     setMode('list');
     setSelectedSchedule(null);
+  };
+
+  const handleSelectNav = (key: string) => {
+    // Defer navigation behind the confirm popup while the AI classification runs.
+    if (classifying) {
+      setPendingNavKey(key);
+      return;
+    }
+    doSelectNav(key);
   };
 
   const openSchedule = (s: PcScheduleDto) => {
@@ -71,11 +89,13 @@ function App() {
   };
 
   const closeWizard = () => {
+    setClassifying(false);
     setSelectedSchedule(null);
     setMode('list');
   };
 
   const finishWizard = () => {
+    setClassifying(false);
     setSelectedSchedule(null);
     setMode('list');
     setFlash('Schedule setup complete');
@@ -89,6 +109,7 @@ function App() {
           onCancel={closeWizard}
           onFinish={finishWizard}
           existingSchedule={selectedSchedule ?? undefined}
+          onClassifyingChange={setClassifying}
         />
       );
     }
@@ -110,6 +131,17 @@ function App() {
       onSelect={handleSelectNav}
     >
       {renderScreen()}
+
+      <ConfirmDialog
+        open={pendingNavKey !== null}
+        title="Classification in progress"
+        message={CLASSIFY_LEAVE_MESSAGE}
+        onConfirm={() => {
+          if (pendingNavKey) doSelectNav(pendingNavKey);
+          setPendingNavKey(null);
+        }}
+        onCancel={() => setPendingNavKey(null)}
+      />
     </AppLayout>
   );
 }

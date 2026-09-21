@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -30,6 +30,7 @@ import RateTableStep, {
 } from './RateTableStep';
 import VariablesStep from './VariablesStep';
 import MethodologiesStep from './MethodologiesStep';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import {
   submitClassification,
   type ClassificationJobDto,
@@ -522,12 +523,19 @@ interface ScheduleWizardProps {
    * step matching the server-persisted percentage.
    */
   existingSchedule?: PcScheduleDto;
+  /** Reports when the AI classification is in progress, so the app can guard side-nav. */
+  onClassifyingChange?: (inProgress: boolean) => void;
 }
+
+/** Shown when the user tries to leave while the AI classification is still running. */
+const CLASSIFY_LEAVE_MESSAGE =
+  'AI Variable Classification is in progress. If you leave now the process may be interrupted. Leave anyway?';
 
 const ScheduleWizard = ({
   onCancel,
   onFinish,
   existingSchedule,
+  onClassifyingChange,
 }: ScheduleWizardProps) => {
   const isResume = !!existingSchedule;
 
@@ -556,8 +564,28 @@ const ScheduleWizard = ({
   // Gates the classification-status GET in the Variables step, so merely
   // navigating to that tab (without a new upload) never polls the classifier.
   const [classificationSubmitted, setClassificationSubmitted] = useState(false);
+  // True while the AI classification job is actively running (reported by VariablesStep).
+  const [classifying, setClassifying] = useState(false);
+  // Navigation action deferred until the user confirms the "leave while classifying" popup.
+  const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Track classifying locally (to guard the wizard's own Back/Cancel) and bubble it up
+  // to the app shell (to guard the side navigation).
+  const handleClassifyingChange = useCallback(
+    (inProgress: boolean) => {
+      setClassifying(inProgress);
+      onClassifyingChange?.(inProgress);
+    },
+    [onClassifyingChange],
+  );
+
+  // Run `action` immediately, or defer behind the confirm popup while classifying.
+  const guardNav = (action: () => void) => {
+    if (classifying) setPendingNav(() => action);
+    else action();
+  };
 
   const qc = useQueryClient();
 
@@ -791,9 +819,12 @@ const ScheduleWizard = ({
     }
   };
 
-  const handleBack = () => {
-    if (activeIndex > 0) setActiveIndex(activeIndex - 1);
-  };
+  const handleBack = () =>
+    guardNav(() => {
+      if (activeIndex > 0) setActiveIndex(activeIndex - 1);
+    });
+
+  const handleCancel = () => guardNav(onCancel);
 
   const isLastStep = activeIndex === STEP_ORDER.length - 1;
 
@@ -801,7 +832,7 @@ const ScheduleWizard = ({
     <PageContainer>
       <WizardLane>
         <WizardHeader>
-          <IconButton onClick={onCancel} color="default">
+          <IconButton onClick={handleCancel} color="default">
             <ArrowBackRoundedIcon />
           </IconButton>
           <Box sx={{ flex: 1 }}>
@@ -891,6 +922,7 @@ const ScheduleWizard = ({
               scheduleGid={created?.scheduleGid ?? null}
               classificationEnabled={classificationSubmitted}
               onVariablesChange={setCurrentVariables}
+              onClassifyingChange={handleClassifyingChange}
             />
           )}
           {activeStep === 'methodologies' && <MethodologiesStep />}
@@ -943,6 +975,17 @@ const ScheduleWizard = ({
           {toast}
         </Alert>
       </Snackbar>
+
+      <ConfirmDialog
+        open={pendingNav !== null}
+        title="Classification in progress"
+        message={CLASSIFY_LEAVE_MESSAGE}
+        onConfirm={() => {
+          pendingNav?.();
+          setPendingNav(null);
+        }}
+        onCancel={() => setPendingNav(null)}
+      />
     </PageContainer>
   );
 };

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Alert,
   AlertTitle,
@@ -36,6 +36,8 @@ interface VariablesStepProps {
    */
   classificationEnabled?: boolean;
   onVariablesChange?: (items: VariableItem[]) => void;
+  /** Reports whether the AI classification job is currently in progress (PENDING/IN_PROGRESS). */
+  onClassifyingChange?: (inProgress: boolean) => void;
 }
 
 const IN_FLIGHT: ClassificationStatus[] = ['PENDING', 'IN_PROGRESS'];
@@ -45,6 +47,7 @@ const VariablesStep = ({
   scheduleGid,
   classificationEnabled = false,
   onVariablesChange,
+  onClassifyingChange,
 }: VariablesStepProps) => {
   const enabled = scheduleId != null;
   const classificationActive = enabled && classificationEnabled;
@@ -122,6 +125,28 @@ const VariablesStep = ({
 
   const aiInFlight = !!data && IN_FLIGHT.includes(data.status);
 
+  // Warn the user before they close/reload the tab while the AI classification is
+  // still running, so an in-progress job isn't abandoned. Browsers show their own
+  // generic confirmation dialog; the custom text is a best-effort for older ones.
+  useEffect(() => {
+    if (!aiInFlight) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue =
+        'AI Variable Classification is still processing. Please don’t close the tab.';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [aiInFlight]);
+
+  // Report the in-progress state up so the wizard/app can guard in-app navigation
+  // (Back, Cancel, side-nav). Reset to false on unmount so the flag never sticks.
+  useEffect(() => {
+    onClassifyingChange?.(aiInFlight);
+    return () => onClassifyingChange?.(false);
+  }, [aiInFlight, onClassifyingChange]);
+
   if (!enabled) {
     return (
       <Alert severity="info" variant="outlined">
@@ -167,7 +192,7 @@ const VariablesStep = ({
     return (
       <LoadingCard
         label={`Classifying "${data!.rateTableName}" with AI…`}
-        detail="Gemini is analysing the rate-table columns and grouping distinct values."
+        detail="AI is analysing. Please don’t close or reload this tab until it finishes."
       />
     );
   }

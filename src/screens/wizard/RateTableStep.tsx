@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import DriveFileRenameOutlineRoundedIcon from '@mui/icons-material/DriveFileRenameOutlineRounded';
 import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import * as XLSX from 'xlsx';
 import { useQuery } from '@tanstack/react-query';
@@ -103,6 +104,20 @@ const rateTableToParsedTable = (t: RateTableDto): ParsedTable => {
 
 const stripExtension = (filename: string): string =>
   filename.replace(/\.[^./\\]+$/, '');
+
+/** Only Excel workbooks are accepted — CSV (and anything else) is rejected. */
+const isExcelFile = (filename: string): boolean => /\.xlsx?$/i.test(filename);
+
+/**
+ * Return a name unique against `taken` (case-insensitive). On a collision it
+ * appends `_1`, `_2`, … so a re-uploaded file shows as `Filename_1`, `Filename_2`.
+ */
+const makeUniqueName = (base: string, taken: Set<string>): string => {
+  if (!taken.has(base.toLowerCase())) return base;
+  let n = 1;
+  while (taken.has(`${base}_${n}`.toLowerCase())) n++;
+  return `${base}_${n}`;
+};
 
 /**
  * Read one XLSX (or CSV) file → produce one ParsedTable per non-empty sheet.
@@ -215,16 +230,13 @@ const RateTableStep = ({
     [savedData],
   );
 
-  // Combined view: persisted (read-only) tables first, then this session's uploads
-  // that aren't already saved under the same name. This prevents a just-uploaded
-  // table from showing twice once it's been persisted and comes back via the GET.
-  const displayTables = useMemo(() => {
-    const savedNames = new Set(savedTables.map((t) => t.name.trim().toLowerCase()));
-    const uploadsNotSaved = tables.filter(
-      (t) => !savedNames.has(t.name.trim().toLowerCase()),
-    );
-    return [...savedTables, ...uploadsNotSaved];
-  }, [savedTables, tables]);
+  // Combined view: persisted (read-only) tables first, then this session's uploads.
+  // Upload names are made unique at upload time (Filename, Filename_1, …), so both a
+  // saved table and a re-uploaded one are shown side by side rather than collapsed.
+  const displayTables = useMemo(
+    () => [...savedTables, ...tables],
+    [savedTables, tables],
+  );
 
   const active =
     displayTables.find((t) => t.id === activeId) ?? displayTables[0] ?? null;
@@ -243,9 +255,24 @@ const RateTableStep = ({
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     setError(null);
+
+    // Only .xlsx/.xls are allowed. Drag-and-drop bypasses the <input accept> filter,
+    // so CSV (and anything else) is rejected here explicitly.
+    const files = Array.from(fileList);
+    const accepted = files.filter((f) => isExcelFile(f.name));
+    const rejected = files.filter((f) => !isExcelFile(f.name));
+    if (rejected.length > 0) {
+      setError(
+        `Only .xlsx / .xls files are supported. Skipped: ${rejected
+          .map((f) => f.name)
+          .join(', ')}`,
+      );
+    }
+    if (accepted.length === 0) return;
+
     const parsedAll: ParsedTable[] = [];
     try {
-      for (const file of Array.from(fileList)) {
+      for (const file of accepted) {
         const parsed = await parseWorkbook(file);
         if (parsed.length === 0) {
           setError(`No sheets found in ${file.name}`);
@@ -261,10 +288,23 @@ const RateTableStep = ({
     }
 
     if (parsedAll.length === 0) return;
-    updateTables([...tables, ...parsedAll]);
-    setActiveId((prev) => prev ?? parsedAll[0].id);
+
+    // Give duplicate names a _1, _2 suffix so a re-uploaded file is shown separately
+    // (checked against both this session's uploads and the saved/GET tables).
+    const taken = new Set<string>([
+      ...tables.map((t) => t.name.toLowerCase()),
+      ...savedTables.map((t) => t.name.toLowerCase()),
+    ]);
+    const named = parsedAll.map((t) => {
+      const uniqueName = makeUniqueName(t.name, taken);
+      taken.add(uniqueName.toLowerCase());
+      return { ...t, name: uniqueName };
+    });
+
+    updateTables([...tables, ...named]);
+    setActiveId((prev) => prev ?? named[0].id);
     // Bubble the first uploaded filename up so the wizard's `canNext` gate opens.
-    onFileSelected(parsedAll[0].name);
+    onFileSelected(named[0].name);
     // Signal a genuine new upload so the wizard knows a re-classify is warranted.
     onUpload?.();
   };
@@ -275,6 +315,23 @@ const RateTableStep = ({
       onTablesChange?.(next);
       if (next.length === 0) onFileSelected('');
       if (activeId === id) setActiveId(next[0]?.id ?? null);
+      return next;
+    });
+  };
+
+  // Rename an uploaded table's tab. Keeps the new name unique against the other
+  // uploaded/saved tables so two tabs never collide.
+  const renameTable = (id: string, rawName: string) => {
+    const clean = rawName.trim();
+    if (!clean) return;
+    setTables((prev) => {
+      const taken = new Set<string>([
+        ...prev.filter((t) => t.id !== id).map((t) => t.name.toLowerCase()),
+        ...savedTables.map((t) => t.name.toLowerCase()),
+      ]);
+      const unique = makeUniqueName(clean, taken);
+      const next = prev.map((t) => (t.id === id ? { ...t, name: unique } : t));
+      onTablesChange?.(next);
       return next;
     });
   };
@@ -339,6 +396,7 @@ const RateTableStep = ({
             activeId={active?.id ?? null}
             onSelect={setActiveId}
             onRemove={removeTable}
+            onRename={renameTable}
           />
           {active && <SheetGrid table={active} />}
         </Box>
@@ -357,60 +415,125 @@ interface TabStripProps {
   onSelect: (id: string) => void;
   /** Omit to render read-only tabs (no delete button) — used for saved tables. */
   onRemove?: (id: string) => void;
+  /** Rename an uploaded tab. Read-only (saved) tabs are never editable. */
+  onRename?: (id: string, name: string) => void;
 }
 
-const TabStrip = ({ tables, activeId, onSelect, onRemove }: TabStripProps) => (
-  <Paper
-    variant="outlined"
-    sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}
-  >
-    {tables.map((t) => {
-      const isActive = t.id === activeId;
-      return (
-        <Box
-          key={t.id}
-          onClick={() => onSelect(t.id)}
-          sx={(theme) => ({
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.5,
-            px: 1.5,
-            py: 0.75,
-            borderRadius: 1.5,
-            cursor: 'pointer',
-            border: '1px solid',
-            borderColor: isActive
-              ? theme.palette.primary.main
-              : 'rgba(15, 23, 42, 0.12)',
-            background: isActive
-              ? 'rgba(79, 70, 229, 0.06)'
-              : theme.palette.background.paper,
-            color: isActive ? 'primary.main' : 'text.primary',
-            fontWeight: isActive ? 700 : 500,
-            transition: 'all 120ms ease',
-          })}
-        >
-          <Typography variant="body2" sx={{ fontWeight: 'inherit' }}>
-            {t.name}
-          </Typography>
-          {!t.readOnly && onRemove && (
-            <Tooltip title="Remove this table">
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemove(t.id);
+const TabStrip = ({ tables, activeId, onSelect, onRemove, onRename }: TabStripProps) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  const startEdit = (t: ParsedTable) => {
+    setEditingId(t.id);
+    setDraft(t.name);
+  };
+  const commit = (id: string) => {
+    onRename?.(id, draft);
+    setEditingId(null);
+  };
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}
+    >
+      {tables.map((t) => {
+        const isActive = t.id === activeId;
+        const isEditing = editingId === t.id;
+        const editable = !t.readOnly && !!onRename;
+        return (
+          <Box
+            key={t.id}
+            onClick={() => !isEditing && onSelect(t.id)}
+            sx={(theme) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 1.5,
+              cursor: isEditing ? 'text' : 'pointer',
+              border: '1px solid',
+              borderColor: isActive
+                ? theme.palette.primary.main
+                : 'rgba(15, 23, 42, 0.12)',
+              background: isActive
+                ? 'rgba(79, 70, 229, 0.06)'
+                : theme.palette.background.paper,
+              color: isActive ? 'primary.main' : 'text.primary',
+              fontWeight: isActive ? 700 : 500,
+              transition: 'all 120ms ease',
+            })}
+          >
+            {isEditing ? (
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={() => commit(t.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commit(t.id);
+                  else if (e.key === 'Escape') setEditingId(null);
                 }}
+                style={{
+                  border: '1px solid #4f46e5',
+                  borderRadius: 4,
+                  padding: '2px 6px',
+                  fontSize: 13,
+                  fontFamily: 'inherit',
+                  minWidth: 160,
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 'inherit' }}
+                onDoubleClick={
+                  editable
+                    ? (e) => {
+                        e.stopPropagation();
+                        startEdit(t);
+                      }
+                    : undefined
+                }
               >
-                <DeleteOutlineRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      );
-    })}
-  </Paper>
-);
+                {t.name}
+              </Typography>
+            )}
+            {editable && !isEditing && (
+              <Tooltip title="Rename this table">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEdit(t);
+                  }}
+                >
+                  <DriveFileRenameOutlineRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {!t.readOnly && onRemove && !isEditing && (
+              <Tooltip title="Remove this table">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(t.id);
+                  }}
+                >
+                  <DeleteOutlineRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        );
+      })}
+    </Paper>
+  );
+};
 
 /* ------------------------------------------------------------------------- */
 /*  Sheet grid                                                                */
