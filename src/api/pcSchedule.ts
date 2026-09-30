@@ -278,3 +278,58 @@ export const getScheduleRateTables = async (
   );
   return data;
 };
+
+/* ---------------------------------------------------------------------- */
+/*  Rate Table Replace (PUT)                                               */
+/* ---------------------------------------------------------------------- */
+
+export interface ReplaceRateTableAxisRequest {
+  kind: 'CONTINUOUS' | 'DATE' | 'STRING' | 'DISCRETE';
+  variableRef: { byName?: string; byGid?: string };
+  isTopAxis: boolean;
+  axisOrder: number;
+  depth: number;
+}
+
+export interface ReplaceRateTableCellCoordRequest {
+  axisOrder: number;
+  byName: string;
+}
+
+export interface ReplaceRateTableCellRequest {
+  coords: ReplaceRateTableCellCoordRequest[];
+  value: number;
+}
+
+export interface ReplaceRateTableRequest {
+  name: string;
+  comment?: string | null;
+  cellType: 'NUMERIC';
+  startDate: string;
+  endDate: string;
+  axes: ReplaceRateTableAxisRequest[];
+  cells: ReplaceRateTableCellRequest[];
+}
+
+export interface ReplacedRateTable {
+  gid: string;
+  name: string;
+  metadataChanged: boolean;
+  axesStructuralChange: boolean;
+  axesUpdated: number;
+  columnsAdded: number;
+  columnsDeleted: number;
+  cellsWritten: number;
+}
+
+/** PUT — replace the content of an existing rate table (axes + cells). */
+export const replaceRateTable = async (
+  tableGid: string,
+  body: ReplaceRateTableRequest,
+): Promise<ReplacedRateTable> => {
+  const { data } = await apiClient.put<ReplacedRateTable>(
+    `/pc/schedule-setup/rate-tables/${tableGid}`,
+    body,
+  );
+  return data;
+};
