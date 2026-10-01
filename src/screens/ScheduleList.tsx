@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   CircularProgress,
+  Divider,
   IconButton,
   Snackbar,
   Table,
@@ -16,6 +17,7 @@ import {
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import CalendarTodayRoundedIcon from '@mui/icons-material/CalendarTodayRounded';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { listPcSchedules, type PcScheduleDto } from '../api/pcSchedule';
@@ -32,9 +34,9 @@ import {
   InlineLoader,
   PageContainer,
   PageLane,
-  ProgressCaptionRow,
   ProgressCell,
   ProgressStack,
+  StatusChip,
   StyledTableHeadRow,
   SurfaceCard,
   TypeChip,
@@ -52,6 +54,13 @@ const extractApiMessage = (err: unknown, fallback: string): string =>
     ?.response?.data?.message ??
   (err as { message?: string })?.message ??
   fallback;
+
+/** Map a progress percentage to a StatusChip tone. */
+const progressTone = (pct: number): 'default' | 'primary' | 'success' => {
+  if (pct >= 100) return 'success';
+  if (pct > 0) return 'primary';
+  return 'default';
+};
 
 const ScheduleList = ({
   onOpen,
@@ -88,15 +97,20 @@ const ScheduleList = ({
     <PageContainer>
       <PageLane>
         <ActionBar>
-          <Tooltip title="Refresh">
+          <Tooltip title="Refresh list">
             <span>
-              <IconButton onClick={() => refetch()} disabled={isFetching}>
-                <RefreshRoundedIcon />
+              <IconButton
+                onClick={() => refetch()}
+                disabled={isFetching}
+                size="small"
+                sx={{ color: 'text.secondary' }}
+              >
+                <RefreshRoundedIcon fontSize="small" />
               </IconButton>
             </span>
           </Tooltip>
           <BrandButton
-            size="large"
+            size="medium"
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={onCreate}
@@ -106,18 +120,27 @@ const ScheduleList = ({
         </ActionBar>
 
         {errorMsg && (
-          <Alert severity="error" variant="outlined">
+          <Alert severity="error" variant="outlined" sx={{ mb: 2 }}>
             {errorMsg}
           </Alert>
         )}
 
         <SurfaceCard elevation={0}>
           {isFetching && !isLoading && <InlineLoader />}
-          <TableContainer sx={{ maxHeight: 640 }}>
-            <Table stickyHeader size="medium">
+
+          <TableContainer>
+            <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+              <colgroup>
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '22%' }} />
+              </colgroup>
               <TableHead>
                 <StyledTableHeadRow>
-                  <TableCell>Schedule ID</TableCell>
+                  <TableCell sx={{ pl: 3 }}>Schedule ID</TableCell>
                   <TableCell>Type</TableCell>
                   <TableCell>Description</TableCell>
                   <TableCell>Start Date</TableCell>
@@ -125,20 +148,19 @@ const ScheduleList = ({
                   <ProgressCell>Progress</ProgressCell>
                 </StyledTableHeadRow>
               </TableHead>
+
               <TableBody>
                 {isLoading && <LoadingRow />}
                 {!isLoading && rows.length === 0 && !errorMsg && <EmptyRow />}
                 {!isLoading &&
                   rows.map((row) => (
-                    <ScheduleRow
-                      key={row.scheduleGid}
-                      row={row}
-                      onOpen={onOpen}
-                    />
+                    <ScheduleRow key={row.scheduleGid} row={row} onOpen={onOpen} />
                   ))}
               </TableBody>
             </Table>
           </TableContainer>
+
+          <Divider />
 
           <TablePagination
             component="div"
@@ -151,6 +173,7 @@ const ScheduleList = ({
               setPageNumber(1);
             }}
             rowsPerPageOptions={[5, 10, 20, 50]}
+            sx={{ borderTop: 'none' }}
           />
         </SurfaceCard>
       </PageLane>
@@ -161,11 +184,7 @@ const ScheduleList = ({
         onClose={() => setToast(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert
-          onClose={() => setToast(null)}
-          severity="success"
-          variant="filled"
-        >
+        <Alert onClose={() => setToast(null)} severity="success" variant="filled">
           {toast}
         </Alert>
       </Snackbar>
@@ -173,14 +192,14 @@ const ScheduleList = ({
   );
 };
 
-/* ------------------------- row sub-components ------------------------- */
+/* ─── row sub-components ─── */
 
 const LoadingRow = () => (
   <ClickableTableRow hover={false} sx={{ cursor: 'default' }}>
     <TableCell colSpan={6} align="center">
-      <Box sx={{ py: 4 }}>
-        <CircularProgress size={28} />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+      <Box sx={{ py: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+        <CircularProgress size={24} thickness={4} />
+        <Typography variant="body2" color="text.secondary">
           Loading schedules…
         </Typography>
       </Box>
@@ -191,11 +210,12 @@ const LoadingRow = () => (
 const EmptyRow = () => (
   <ClickableTableRow hover={false} sx={{ cursor: 'default' }}>
     <TableCell colSpan={6} align="center">
-      <Box sx={{ py: 6 }}>
-        <Typography variant="subtitle1" color="text.secondary">
-          No schedules yet
+      <Box sx={{ py: 7, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+        <CalendarTodayRoundedIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 0.5 }} />
+        <Typography variant="subtitle2" color="text.secondary">
+          No schedules found
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+        <Typography variant="body2" color="text.disabled">
           Click <strong>Create Schedule</strong> to add your first one.
         </Typography>
       </Box>
@@ -210,47 +230,86 @@ interface ScheduleRowProps {
 
 const ScheduleRow = ({ row, onOpen }: ScheduleRowProps) => {
   const pct = row.percentage ?? getScheduleProgress(row.scheduleGid);
+  const label = progressLabel(pct);
   const isComplete = pct >= 100;
+
   return (
     <ClickableTableRow hover onClick={() => onOpen(row)}>
-      <TableCell>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+      {/* Schedule ID */}
+      <TableCell sx={{ pl: 3, py: 1.5 }}>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 600, letterSpacing: '0.01em', fontFamily: '"Fira Code", monospace' }}
+        >
           {row.scheduleId}
         </Typography>
       </TableCell>
-      <TableCell>
+
+      {/* Type badge */}
+      <TableCell sx={{ py: 1.5 }}>
         <TypeChip
           label={row.scheduleType}
           size="small"
           colorVariant={row.scheduleType === 'PCE' ? 'primary' : 'secondary'}
         />
       </TableCell>
-      <TableCell>
-        <Typography variant="body2">{row.description || '—'}</Typography>
+
+      {/* Description */}
+      <TableCell sx={{ py: 1.5, maxWidth: 280 }}>
+        {row.description ? (
+          <Typography variant="body2" noWrap title={row.description}>
+            {row.description}
+          </Typography>
+        ) : (
+          <Typography variant="body2" color="text.disabled">
+            —
+          </Typography>
+        )}
       </TableCell>
-      <TableCell>{row.startDate}</TableCell>
-      <TableCell>{row.endDate}</TableCell>
-      <TableCell>
+
+      {/* Start date */}
+      <TableCell sx={{ py: 1.5 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {row.startDate ?? '—'}
+        </Typography>
+      </TableCell>
+
+      {/* End date */}
+      <TableCell sx={{ py: 1.5 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {row.endDate ?? '—'}
+        </Typography>
+      </TableCell>
+
+      {/* Progress */}
+      <ProgressCell sx={{ py: 1.5 }}>
         <ProgressStack>
-          <ProgressCaptionRow>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <StatusChip label={label} tone={progressTone(pct)} />
             <Typography
               variant="caption"
-              color={isComplete ? 'success.main' : 'text.secondary'}
-              sx={{ fontWeight: 600 }}
+              color="text.secondary"
+              sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}
             >
-              {progressLabel(pct)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
               {pct}%
             </Typography>
-          </ProgressCaptionRow>
+          </Box>
           <BrandLinearProgress
             variant="determinate"
             value={pct}
             tone={isComplete ? 'success' : 'primary'}
+            barHeight={4}
           />
         </ProgressStack>
-      </TableCell>
+      </ProgressCell>
     </ClickableTableRow>
   );
 };

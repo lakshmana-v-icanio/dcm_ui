@@ -95,14 +95,42 @@ export const StyledTableHeadRow = styled(TableRow)(({ theme }) => ({
 }));
 
 /** Clickable table row with hover transition — used in list screens. */
-export const ClickableTableRow = styled(TableRow)({
+export const ClickableTableRow = styled(TableRow)(({ theme }) => ({
   cursor: 'pointer',
   transition: 'background-color 120ms ease',
   '&:last-child td': { border: 0 },
+  '&.MuiTableRow-hover:hover': {
+    backgroundColor: alpha(theme.palette.primary.main, 0.04),
+  },
+}));
+
+/**
+ * Status badge chip with semantic tones. Use `tone` to convey workflow state —
+ * default=gray, primary=blue, success=green, warning=amber.
+ */
+type StatusTone = 'default' | 'primary' | 'success' | 'warning';
+export const StatusChip = styled(Chip, {
+  shouldForwardProp: (prop) => prop !== 'tone',
+})<{ tone?: StatusTone }>(({ theme, tone = 'default' }) => {
+  const map: Record<StatusTone, { bg: string; color: string }> = {
+    default: { bg: 'rgba(0,0,0,0.06)', color: theme.palette.text.secondary },
+    primary: { bg: alpha(theme.palette.primary.main, 0.10), color: theme.palette.primary.dark },
+    success: { bg: alpha(theme.palette.success.main, 0.10), color: theme.palette.success.dark },
+    warning: { bg: alpha(theme.palette.warning.main, 0.12), color: theme.palette.warning.dark ?? '#92400E' },
+  };
+  return {
+    fontWeight: 600,
+    fontSize: '0.6875rem',
+    height: 22,
+    backgroundColor: map[tone].bg,
+    color: map[tone].color,
+    borderRadius: 4,
+    '& .MuiChip-label': { paddingInline: '8px' },
+  };
 });
 
 /** Wide leading cell wrapper for the progress column. */
-export const ProgressCell = styled(TableCell)({ minWidth: 220 });
+export const ProgressCell = styled(TableCell)({ minWidth: 180 });
 
 /** Page container with responsive padding and max-width constraint. */
 export const PageContainer = styled(Box)(({ theme }) => ({

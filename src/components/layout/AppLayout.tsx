@@ -34,7 +34,7 @@ const AppLayout = ({ title, subtitle, active, onSelect, children }: AppLayoutPro
           transition: 'margin 220ms ease',
         }}
       >
-        <Toolbar sx={{ minHeight: 72 }} />
+        <Toolbar sx={{ minHeight: 64 }} />
         {children}
       </Box>
     </Box>

@@ -1,6 +1,7 @@
 import {
   AppBar,
   Box,
+  Divider,
   Toolbar,
   Typography,
 } from '@mui/material';
@@ -20,23 +21,29 @@ const Navbar = ({ title, subtitle, sidebarWidth }: NavbarProps) => {
         width: `calc(100% - ${sidebarWidth}px)`,
         ml: `${sidebarWidth}px`,
         transition: 'width 220ms ease, margin 220ms ease',
-        background: '#ffffff',
+        bgcolor: 'background.paper',
         color: 'text.primary',
-        borderBottom: '1px solid rgba(0, 0, 0, 0.10)',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
       }}
     >
-      <Toolbar sx={{ minHeight: 72, gap: 2 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+      <Toolbar sx={{ minHeight: 64, gap: 2 }}>
+        <Box>
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 700, lineHeight: 1.15, fontSize: '1rem' }}
+          >
             {title}
           </Typography>
           {subtitle && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
               {subtitle}
             </Typography>
           )}
         </Box>
+        <Box sx={{ flex: 1 }} />
       </Toolbar>
+      <Divider />
     </AppBar>
   );
 };

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Box,
   Button,
-  Chip,
   Tab,
   Tabs,
   Typography,
@@ -17,6 +16,7 @@ import VariablesTab from './detail/VariablesTab';
 import MethodologiesTab from './detail/MethodologiesTab';
 import type { PcScheduleDto } from '../api/pcSchedule';
 import { classifyVariables, type ClassifiedVariable } from '../api/aiVariables';
+import { TypeChip } from '../theme/styled';
 
 interface ScheduleDetailProps {
   schedule: PcScheduleDto;
@@ -52,155 +52,127 @@ const ScheduleDetail = ({ schedule, onBack }: ScheduleDetailProps) => {
   };
 
   return (
-    <Box
-      sx={{
-        py: { xs: 3, md: 4 },
-        px: { xs: 2, md: 4 },
-      }}
-    >
+    <Box sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 4 } }}>
       <Box sx={{ maxWidth: 1280, mx: 'auto' }}>
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            mb: 3,
-            gap: 2,
-            flexWrap: 'wrap',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button
-              variant="text"
-              startIcon={<ArrowBackRoundedIcon />}
-              onClick={onBack}
-              sx={{ color: 'text.secondary' }}
-            >
-              Back to Schedules
-            </Button>
-          </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip
-              label={schedule.scheduleType}
-              size="small"
-              sx={{
-                fontWeight: 700,
-                bgcolor:
-                  schedule.scheduleType === 'PCE'
-                    ? 'rgba(79, 70, 229, 0.12)'
-                    : 'rgba(6, 182, 212, 0.12)',
-                color:
-                  schedule.scheduleType === 'PCE'
-                    ? 'primary.main'
-                    : 'secondary.dark',
-              }}
-            />
-          </Box>
+        {/* Breadcrumb / back navigation */}
+        <Box sx={{ mb: 3 }}>
+          <Button
+            variant="text"
+            startIcon={<ArrowBackRoundedIcon fontSize="small" />}
+            onClick={onBack}
+            size="small"
+            sx={{
+              color: 'text.secondary',
+              fontWeight: 500,
+              px: 1,
+              '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+            }}
+          >
+            PC Schedules
+          </Button>
         </Box>
 
         {/* Schedule identity card */}
         <Box
           sx={{
             p: 3,
-            borderRadius: 3,
-            border: '1px solid rgba(15, 23, 42, 0.06)',
-            background:
-              'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(6, 182, 212, 0.06) 100%)',
             mb: 3,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderLeft: '4px solid',
+            borderLeftColor: 'primary.main',
+            bgcolor: 'background.paper',
+            boxShadow: '0 1px 3px 0 rgba(0,0,0,0.06)',
           }}
         >
-          <Typography variant="overline" color="text.secondary">
-            Schedule
-          </Typography>
-          <Typography variant="h4" sx={{ fontWeight: 800, mt: 0.5 }}>
-            {schedule.scheduleId}
-          </Typography>
-          {schedule.description && (
-            <Typography variant="body1" color="text.primary" sx={{ mt: 1 }}>
-              {schedule.description}
-            </Typography>
-          )}
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 3,
-              mt: 2,
-              flexWrap: 'wrap',
-              color: 'text.secondary',
-              fontSize: 14,
-            }}
-          >
-            <span>
-              <strong>Start:</strong> {schedule.startDate}
-            </span>
-            <span>
-              <strong>End:</strong> {schedule.endDate}
-            </span>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                Schedule
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.25, lineHeight: 1.2 }}>
+                {schedule.scheduleId}
+              </Typography>
+              {schedule.description && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  {schedule.description}
+                </Typography>
+              )}
+              <Box sx={{ display: 'flex', gap: 3, mt: 1.5, flexWrap: 'wrap' }}>
+                <Box>
+                  <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
+                    Start Date
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {schedule.startDate ?? '—'}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
+                    End Date
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {schedule.endDate ?? '—'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            <TypeChip
+              label={schedule.scheduleType}
+              size="small"
+              colorVariant={schedule.scheduleType === 'PCE' ? 'primary' : 'secondary'}
+            />
           </Box>
         </Box>
 
-        {/* Tabs */}
-        <Box
-          sx={{
-            borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
-            mb: 3,
-          }}
-        >
+        {/* Tab navigation */}
+        <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', mb: 3 }}>
           <Tabs
             value={active}
             onChange={(_, val: TabKey) => setActive(val)}
             slotProps={{
               indicator: {
-                sx: {
-                  height: 3,
-                  borderRadius: 3,
-                  background:
-                    'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                },
+                sx: { height: 2, bgcolor: 'primary.main', borderRadius: 0 },
               },
             }}
+            sx={{ minHeight: 44 }}
           >
             <Tab
               value="rate-tables"
               label="Rate Tables"
-              icon={<GridViewRoundedIcon fontSize="small" />}
+              icon={<GridViewRoundedIcon sx={{ fontSize: 16 }} />}
               iconPosition="start"
-              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 48 }}
+              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 44, fontSize: '0.875rem' }}
             />
             <Tab
               value="variables"
               label="Variables"
-              icon={<ViewModuleRoundedIcon fontSize="small" />}
+              icon={<ViewModuleRoundedIcon sx={{ fontSize: 16 }} />}
               iconPosition="start"
-              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 48 }}
+              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 44, fontSize: '0.875rem' }}
             />
             <Tab
               value="methodologies"
               label="Methodologies"
-              icon={<PlayCircleFilledRoundedIcon fontSize="small" />}
+              icon={<PlayCircleFilledRoundedIcon sx={{ fontSize: 16 }} />}
               iconPosition="start"
-              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 48 }}
+              sx={{ fontWeight: 600, textTransform: 'none', minHeight: 44, fontSize: '0.875rem' }}
             />
           </Tabs>
         </Box>
 
         {/*
           All three tab bodies stay mounted; only the active one is visible.
-          This preserves each tab's internal state (rate-table cells, focused
-          cell, variable drag positions) across tab switches — otherwise
-          unmounting resets useState every time the user navigates away.
+          This preserves each tab's internal state across tab switches.
         */}
         <Box sx={{ display: active === 'rate-tables' ? 'block' : 'none' }}>
           <RateTableTab onNext={handleClassifyAndAdvance} nextLoading={classifying} />
         </Box>
         <Box sx={{ display: active === 'variables' ? 'block' : 'none' }}>
-          <VariablesTab
-            classified={classified}
-            loading={classifying}
-            error={classifyError}
-          />
+          <VariablesTab classified={classified} loading={classifying} error={classifyError} />
         </Box>
         <Box sx={{ display: active === 'methodologies' ? 'block' : 'none' }}>
           <MethodologiesTab />
