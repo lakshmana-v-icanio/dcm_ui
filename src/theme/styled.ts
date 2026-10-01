@@ -30,11 +30,15 @@ export const BrandButton = styled(Button)<
   ButtonProps & { component?: ElementType }
 >(({ theme }) => ({
   minWidth: 200,
-  background: theme.brand.gradient,
+  background: theme.palette.primary.main,
   color: theme.palette.primary.contrastText,
   [`&.${buttonClasses.disabled}`]: {
     background: theme.palette.action.disabledBackground,
     color: theme.palette.action.disabled,
+  },
+  '&:hover': {
+    background: theme.palette.primary.dark,
+    boxShadow: theme.brand.buttonShadowHover,
   },
 }));
 
@@ -63,31 +67,30 @@ export const BrandLinearProgress = styled(LinearProgress, {
 })<BrandProgressProps>(({ theme, tone = 'primary', barHeight = 6 }) => ({
   height: barHeight,
   borderRadius: barHeight / 2,
-  backgroundColor: 'rgba(15, 23, 42, 0.06)',
+  backgroundColor: 'rgba(0, 0, 0, 0.08)',
   [`& .${linearProgressClasses.bar}`]: {
     borderRadius: barHeight / 2,
     background:
-      tone === 'success' ? theme.brand.gradientSuccess : theme.brand.gradient,
+      tone === 'success' ? theme.brand.gradientSuccess : theme.palette.primary.main,
   },
 }));
 
 /** Thin indeterminate loader — for the top of a table while re-fetching. */
 export const InlineLoader = styled(LinearProgress)(({ theme }) => ({
   height: 2,
-  [`& .${linearProgressClasses.bar}`]: { background: theme.brand.gradient },
+  [`& .${linearProgressClasses.bar}`]: { background: theme.palette.primary.main },
 }));
 
-/** Table head with the brand wash + bold cells. Use as `<StyledTableHead>` around `<TableRow>`. */
+/** Table head with solid background + bold cells. */
 export const StyledTableHeadRow = styled(TableRow)(({ theme }) => ({
   '& th': {
-    fontWeight: 700,
-    color: theme.palette.text.primary,
-    // Opaque base + translucent wash on top. Without the solid backgroundColor the
-    // header wash is nearly transparent, so with `stickyHeader` the scrolling rows
-    // show through and overlap the header text.
-    backgroundColor: theme.palette.background.paper,
-    backgroundImage: theme.brand.tableHeaderWash,
-    borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
+    fontWeight: 600,
+    fontSize: '0.8125rem',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    color: theme.palette.text.secondary,
+    backgroundColor: theme.brand.tableHeaderBg,
+    borderBottom: `1px solid rgba(0, 0, 0, 0.10)`,
   },
 }));
 
@@ -202,16 +205,13 @@ export const DraftCard = styled(Paper)(({ theme }) => ({
   whiteSpace: 'pre-wrap',
 }));
 
-/** Dashed drop-zone with a soft brand tint — used by RateTableStep. */
+/** Dashed drop-zone — used by RateTableStep. */
 export const DropZone = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
   textAlign: 'center',
   borderStyle: 'dashed',
-  borderColor: alpha(theme.palette.primary.main, 0.4),
-  background: `linear-gradient(135deg, ${alpha(
-    theme.palette.primary.main,
-    0.04,
-  )} 0%, ${alpha(theme.palette.secondary.main, 0.04)} 100%)`,
+  borderColor: alpha(theme.palette.primary.main, 0.35),
+  background: alpha(theme.palette.primary.main, 0.03),
 }));
 
 /**

@@ -20,10 +20,9 @@ const Navbar = ({ title, subtitle, sidebarWidth }: NavbarProps) => {
         width: `calc(100% - ${sidebarWidth}px)`,
         ml: `${sidebarWidth}px`,
         transition: 'width 220ms ease, margin 220ms ease',
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(14px)',
+        background: '#ffffff',
         color: 'text.primary',
-        borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.10)',
       }}
     >
       <Toolbar sx={{ minHeight: 72, gap: 2 }}>

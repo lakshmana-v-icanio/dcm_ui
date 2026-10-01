@@ -50,21 +50,19 @@ const Sidebar = ({ open, onToggle, active, onSelect }: SidebarProps) => {
         sx={{
           mx: 1.25,
           my: 0.5,
-          borderRadius: 2,
-          minHeight: 46,
+          borderRadius: 1,
+          minHeight: 44,
           justifyContent: open ? 'flex-start' : 'center',
           px: open ? 1.5 : 1,
-          color: selected ? '#fff' : 'rgba(226, 232, 240, 0.85)',
+          color: selected ? '#fff' : 'rgba(203, 213, 225, 0.85)',
           background: selected
-            ? 'linear-gradient(135deg, rgba(129, 140, 248, 0.35) 0%, rgba(6, 182, 212, 0.3) 100%)'
+            ? 'rgba(26, 86, 219, 0.85)'
             : 'transparent',
-          boxShadow: selected
-            ? 'inset 0 0 0 1px rgba(255,255,255,0.08)'
-            : 'none',
+          boxShadow: 'none',
           '&:hover': {
             background: selected
-              ? 'linear-gradient(135deg, rgba(129, 140, 248, 0.45) 0%, rgba(6, 182, 212, 0.4) 100%)'
-              : 'rgba(255,255,255,0.06)',
+              ? 'rgba(26, 86, 219, 0.90)'
+              : 'rgba(255,255,255,0.07)',
           },
           '&.Mui-selected': { background: undefined },
         }}
@@ -118,8 +116,7 @@ const Sidebar = ({ open, onToggle, active, onSelect }: SidebarProps) => {
           overflowX: 'hidden',
           transition: 'width 220ms ease',
           border: 'none',
-          background:
-            'linear-gradient(180deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%)',
+          background: '#1E293B',
           color: '#e2e8f0',
         },
       }}
@@ -138,16 +135,14 @@ const Sidebar = ({ open, onToggle, active, onSelect }: SidebarProps) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
             <Box
               sx={{
-                width: 38,
-                height: 38,
-                borderRadius: 2,
+                width: 36,
+                height: 36,
+                borderRadius: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background:
-                  'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
+                background: '#1A56DB',
                 color: '#fff',
-                boxShadow: '0 8px 24px -10px rgba(79, 70, 229, 0.8)',
               }}
             >
               <RocketLaunchRoundedIcon fontSize="small" />

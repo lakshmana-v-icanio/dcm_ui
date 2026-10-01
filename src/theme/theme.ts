@@ -1,16 +1,5 @@
 import { createTheme } from '@mui/material/styles';
 
-/**
- * Design tokens exposed to every component via the MUI theme.
- *
- * Rules of the road for this project:
- *   1. Never hard-code a hex color inside a component — reach for `theme.palette` or
- *      `theme.brand` instead. Colors live here, layout lives in components.
- *   2. Repeated visual motifs (brand gradient, tinted-row background, table-header wash)
- *      are named tokens under `brand`, referenced by name at call sites.
- *   3. Component-scoped overrides use `styleOverrides` below rather than per-usage `sx`.
- */
-
 declare module '@mui/material/styles' {
   interface Theme {
     brand: {
@@ -21,7 +10,7 @@ declare module '@mui/material/styles' {
       buttonShadow: string;
       buttonShadowHover: string;
       hairline: string;
-      tableHeaderWash: string;
+      tableHeaderBg: string;
       rowHoverWash: string;
     };
   }
@@ -30,38 +19,38 @@ declare module '@mui/material/styles' {
   }
 }
 
-const PRIMARY = '#4f46e5';
-const SECONDARY = '#06b6d4';
-const SUCCESS = '#10b981';
+const PRIMARY = '#1A56DB';   // Professional enterprise blue
+const SECONDARY = '#64748B'; // Professional slate gray
+const SUCCESS = '#16A34A';   // Clean green
 
 const brand = {
-  gradient: `linear-gradient(135deg, ${PRIMARY} 0%, ${SECONDARY} 100%)`,
-  gradientSoft: `linear-gradient(135deg, rgba(79, 70, 229, 0.10) 0%, rgba(6, 182, 212, 0.08) 100%)`,
-  gradientSuccess: `linear-gradient(135deg, ${SUCCESS} 0%, ${SECONDARY} 100%)`,
-  cardShadow: '0 20px 60px -30px rgba(15, 23, 42, 0.20)',
-  buttonShadow: '0 6px 20px -6px rgba(79, 70, 229, 0.55)',
-  buttonShadowHover: '0 8px 24px -6px rgba(79, 70, 229, 0.70)',
-  hairline: '1px solid rgba(15, 23, 42, 0.06)',
-  tableHeaderWash: `linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(6, 182, 212, 0.06) 100%)`,
-  rowHoverWash: 'rgba(15, 23, 42, 0.04)',
+  gradient: PRIMARY,
+  gradientSoft: `rgba(26, 86, 219, 0.06)`,
+  gradientSuccess: SUCCESS,
+  cardShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
+  buttonShadow: 'none',
+  buttonShadowHover: '0 2px 8px -2px rgba(26, 86, 219, 0.30)',
+  hairline: '1px solid rgba(0, 0, 0, 0.10)',
+  tableHeaderBg: '#F1F5F9',
+  rowHoverWash: 'rgba(0, 0, 0, 0.03)',
 };
 
 const theme = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: PRIMARY, light: '#818cf8', dark: '#3730a3', contrastText: '#ffffff' },
-    secondary: { main: SECONDARY, light: '#67e8f9', dark: '#0e7490' },
+    primary: { main: PRIMARY, light: '#3B82F6', dark: '#1E3A8A', contrastText: '#ffffff' },
+    secondary: { main: SECONDARY, light: '#94A3B8', dark: '#334155' },
     success: { main: SUCCESS },
-    error: { main: '#ef4444' },
-    warning: { main: '#f59e0b' },
-    background: { default: '#f5f7fb', paper: '#ffffff' },
-    text: { primary: '#0f172a', secondary: '#475569' },
+    error: { main: '#DC2626' },
+    warning: { main: '#D97706' },
+    background: { default: '#F8FAFC', paper: '#ffffff' },
+    text: { primary: '#0F172A', secondary: '#475569' },
   },
-  shape: { borderRadius: 14 },
+  shape: { borderRadius: 8 },
   typography: {
     fontFamily:
       '"Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif',
-    h4: { fontWeight: 700, letterSpacing: '-0.5px' },
+    h4: { fontWeight: 700, letterSpacing: '-0.25px' },
     h5: { fontWeight: 700 },
     h6: { fontWeight: 600 },
     subtitle1: { fontWeight: 500 },
@@ -72,10 +61,11 @@ const theme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 6,
           paddingInline: 20,
-          paddingBlock: 10,
-          '&.MuiButton-containedPrimary': { boxShadow: brand.buttonShadow },
+          paddingBlock: 9,
+          boxShadow: 'none',
+          '&:hover': { boxShadow: 'none' },
           '&.MuiButton-containedPrimary:hover': {
             boxShadow: brand.buttonShadowHover,
           },
@@ -85,9 +75,9 @@ const theme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 6,
           backgroundColor: '#ffffff',
-          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#818cf8' },
+          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#93C5FD' },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: PRIMARY,
             borderWidth: 2,
@@ -97,7 +87,18 @@ const theme = createTheme({
     },
     MuiPaper: {
       styleOverrides: {
-        rounded: { borderRadius: 18 },
+        rounded: { borderRadius: 10 },
+        elevation1: { boxShadow: brand.cardShadow },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { borderRadius: 6 },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: { borderColor: 'rgba(0,0,0,0.08)' },
       },
     },
   },
