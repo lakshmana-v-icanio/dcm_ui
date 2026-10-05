@@ -1,13 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import {
-  Alert,
-  AlertTitle,
-  Box,
-  Chip,
-  CircularProgress,
-  Typography,
-} from '@mui/material';
-import HourglassTopRoundedIcon from '@mui/icons-material/HourglassTopRounded';
+import { Hourglass } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import VariablesTab, { type VariableItem } from '../detail/VariablesTab';
@@ -23,20 +15,15 @@ import {
   type ClassifyVariablesResponse,
 } from '../../api/aiVariables';
 import { getScheduleVariables } from '../../api/pcSchedule';
+import { Alert } from '../../components/ui/Alert';
+import { Spinner } from '../../components/ui/Spinner';
+import { Badge } from '../../components/ui/Badge';
 
 interface VariablesStepProps {
   scheduleId: number | null;
-  /** Schedule GID — used to fetch already-persisted variables for this schedule. */
   scheduleGid?: string | null;
-  /**
-   * Whether to poll the AI classification job. Only true after a classification
-   * was actually submitted this session (a new rate-table upload → Save & Next).
-   * When false, navigating to this tab shows saved variables WITHOUT calling the
-   * classification-status GET.
-   */
   classificationEnabled?: boolean;
   onVariablesChange?: (items: VariableItem[]) => void;
-  /** Reports whether the AI classification job is currently in progress (PENDING/IN_PROGRESS). */
   onClassifyingChange?: (inProgress: boolean) => void;
 }
 
@@ -53,39 +40,25 @@ const VariablesStep = ({
   const classificationActive = enabled && classificationEnabled;
 
   const { data, isLoading, isFetching, isError, error } = useQuery({
-    queryKey: enabled
-      ? queryKeys.classification.latest(scheduleId!)
-      : ['classification', 'noop'],
+    queryKey: enabled ? queryKeys.classification.latest(scheduleId!) : ['classification', 'noop'],
     queryFn: () => getLatestClassification(scheduleId!),
     enabled: classificationActive,
-    // Poll every 2s while the server-side job is still running.
-    refetchInterval: (q) =>
-      IN_FLIGHT.includes(q.state.data?.status as ClassificationStatus)
-        ? 2000
-        : false,
-    // Don't refetch a terminal state on window focus.
+    refetchInterval: (q) => IN_FLIGHT.includes(q.state.data?.status as ClassificationStatus) ? 2000 : false,
     refetchOnWindowFocus: false,
-    // 404 is a legitimate "no job yet" state, so don't retry it.
     retry: (failureCount, err) => {
-      const status =
-        (err as { response?: { status?: number } })?.response?.status ?? 0;
+      const status = (err as { response?: { status?: number } })?.response?.status ?? 0;
       if (status === 404) return false;
       return failureCount < 1;
     },
   });
 
-  // Already-persisted variables for this schedule. Fires on navigation to this
-  // step; used to populate the board when there's no fresh AI classification.
   const { data: savedData, isLoading: savedLoading } = useQuery({
-    queryKey: scheduleGid
-      ? queryKeys.scheduleSetup.variables(scheduleGid)
-      : ['schedule-setup', 'variables', 'noop'],
+    queryKey: scheduleGid ? queryKeys.scheduleSetup.variables(scheduleGid) : ['schedule-setup', 'variables', 'noop'],
     queryFn: () => getScheduleVariables(scheduleGid!),
     enabled: !!scheduleGid,
     refetchOnMount: 'always',
   });
 
-  // AI classification result (only when a job has COMPLETED).
   const aiClassified = useMemo(() => {
     if (data?.status !== 'COMPLETED') return undefined;
     const buckets = parseClassificationResult(data.responsePayload);
@@ -93,22 +66,16 @@ const VariablesStep = ({
     return flattenClassifiedResponse(buckets as ClassifyVariablesResponse);
   }, [data?.status, data?.responsePayload]);
 
-  // Persisted variables mapped into the board's card model.
   const savedClassified = useMemo<ClassifiedVariable[] | undefined>(() => {
     if (!savedData) return undefined;
     const out: ClassifiedVariable[] = [];
-    savedData.discrete.forEach((d) =>
-      out.push({ name: d.name, type: 'Discrete', values: d.children.map((c) => c.name) }),
-    );
+    savedData.discrete.forEach((d) => out.push({ name: d.name, type: 'Discrete', values: d.children.map((c) => c.name) }));
     savedData.continuous.forEach((v) => out.push({ name: v.name, type: 'Continuous', values: [] }));
     savedData.date.forEach((v) => out.push({ name: v.name, type: 'Date', values: [] }));
     savedData.string.forEach((v) => out.push({ name: v.name, type: 'String', values: [] }));
     return out;
   }, [savedData]);
 
-  // Combined view: persisted variables + AI-classified ones, deduped by name so
-  // a newly-classified variable that's already saved isn't shown twice. Existing
-  // (saved) variables are never removed — AI results are added alongside them.
   const boardData = useMemo<ClassifiedVariable[]>(() => {
     const saved = savedClassified ?? [];
     const ai = aiClassified ?? [];
@@ -125,115 +92,79 @@ const VariablesStep = ({
 
   const aiInFlight = !!data && IN_FLIGHT.includes(data.status);
 
-  // Warn the user before they close/reload the tab while the AI classification is
-  // still running, so an in-progress job isn't abandoned. Browsers show their own
-  // generic confirmation dialog; the custom text is a best-effort for older ones.
   useEffect(() => {
     if (!aiInFlight) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue =
-        'AI Variable Classification is still processing. Please don’t close the tab.';
+      e.returnValue = "AI Variable Classification is still processing. Please don't close the tab.";
       return e.returnValue;
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [aiInFlight]);
 
-  // Report the in-progress state up so the wizard/app can guard in-app navigation
-  // (Back, Cancel, side-nav). Reset to false on unmount so the flag never sticks.
   useEffect(() => {
     onClassifyingChange?.(aiInFlight);
     return () => onClassifyingChange?.(false);
   }, [aiInFlight, onClassifyingChange]);
 
   if (!enabled) {
-    return (
-      <Alert severity="info" variant="outlined">
-        Complete the schedule step first to enable AI classification.
-      </Alert>
-    );
+    return <Alert severity="info" variant="outlined">Complete the schedule step first to enable AI classification.</Alert>;
   }
 
-  // Show the board as soon as there's ANY data (saved or classified). While a
-  // new upload is being classified, keep the existing variables visible and
-  // surface an inline "Classifying…" indicator rather than blanking the board.
   if (boardData.length > 0) {
     const hasAi = !!aiClassified && aiClassified.length > 0;
     return (
-      <Box>
-        <Box sx={{ mb: 2, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Chip label="Saved variables" size="small" color="primary" variant="outlined" />
-          {hasAi && data && (
-            <Chip label={`AI · Job #${data.jobId}`} size="small" color="secondary" variant="outlined" />
-          )}
+      <div>
+        <div className="mb-3 flex gap-2 items-center flex-wrap">
+          <Badge label="Saved variables" tone="primary" />
+          {hasAi && data && <Badge label={`AI · Job #${data.jobId}`} tone="secondary" />}
           {aiInFlight && (
-            <Chip
-              icon={<CircularProgress size={12} color="inherit" />}
-              label="Classifying…"
-              size="small"
-              variant="outlined"
-            />
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border border-slate-200 text-slate-600">
+              <Spinner size={10} /> Classifying…
+            </div>
           )}
-          {isFetching && !aiInFlight && <CircularProgress size={14} sx={{ ml: 1 }} />}
-        </Box>
-        <VariablesTab
-          classified={boardData}
-          loading={false}
-          error={null}
-          onVariablesChange={onVariablesChange}
-        />
-      </Box>
+          {isFetching && !aiInFlight && <Spinner size={14} />}
+        </div>
+        <VariablesTab classified={boardData} loading={false} error={null} onVariablesChange={onVariablesChange} />
+      </div>
     );
   }
 
-  // Nothing to show yet but a new upload is being classified.
   if (aiInFlight) {
     return (
       <LoadingCard
         label={`Classifying "${data!.rateTableName}" with AI…`}
-        detail="AI is analysing. Please don’t close or reload this tab until it finishes."
+        detail="AI is analysing. Please don't close or reload this tab until it finishes."
       />
     );
   }
 
-  // Still loading — wait on the classification query only when it's active.
   if (savedLoading || (classificationActive && isLoading)) {
     return <LoadingCard label="Loading variables…" />;
   }
 
   if (data?.status === 'FAILED') {
     return (
-      <Alert severity="error" variant="outlined">
-        <AlertTitle>Classification failed</AlertTitle>
+      <Alert severity="error" variant="outlined" title="Classification failed">
         {data.errorMessage ?? 'The AI service could not classify this rate table.'}
       </Alert>
     );
   }
 
-  // Non-404 error with nothing persisted to fall back to.
   if (isError) {
-    const status =
-      (error as { response?: { status?: number } })?.response?.status ?? 0;
+    const status = (error as { response?: { status?: number } })?.response?.status ?? 0;
     if (status !== 404) {
       const message =
         (error as { response?: { data?: { message?: string } }; message?: string })
-          ?.response?.data?.message ??
-        (error as { message?: string })?.message ??
-        'Failed to load classification';
-      return (
-        <Alert severity="error" variant="outlined">
-          {message}
-        </Alert>
-      );
+          ?.response?.data?.message ?? (error as { message?: string })?.message ?? 'Failed to load classification';
+      return <Alert severity="error" variant="outlined">{message}</Alert>;
     }
   }
 
-  // Nothing classified or saved yet.
   return (
     <Alert severity="info" variant="outlined">
-      Upload a rate table on the previous step and click{' '}
-      <strong>Save &amp; Next</strong> to submit for AI classification.
+      Upload a rate table on the previous step and click <strong>Save &amp; Next</strong> to submit for AI classification.
     </Alert>
   );
 };
@@ -242,25 +173,16 @@ interface LoadingCardProps {
   label: string;
   detail?: string;
 }
+
 const LoadingCard = ({ label, detail }: LoadingCardProps) => (
-  <Alert
-    severity="info"
-    icon={<HourglassTopRoundedIcon />}
-    variant="outlined"
-  >
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <CircularProgress size={22} />
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-          {label}
-        </Typography>
-        {detail && (
-          <Typography variant="caption" color="text.secondary">
-            {detail}
-          </Typography>
-        )}
-      </Box>
-    </Box>
+  <Alert severity="info" icon={<Hourglass className="w-4 h-4 text-blue-600 shrink-0" />} variant="outlined">
+    <div className="flex items-center gap-3">
+      <Spinner size={20} />
+      <div>
+        <p className="text-sm font-bold">{label}</p>
+        {detail && <p className="text-xs text-slate-500 mt-0.5">{detail}</p>}
+      </div>
+    </div>
   </Alert>
 );
 

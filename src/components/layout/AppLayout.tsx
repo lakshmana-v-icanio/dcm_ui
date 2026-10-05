@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Box, Toolbar } from '@mui/material';
 import Sidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Sidebar';
 import Navbar from './Navbar';
 
@@ -17,7 +16,7 @@ const AppLayout = ({ title, subtitle, active, onSelect, children }: AppLayoutPro
   const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+    <div className="flex min-h-screen bg-bg">
       <Sidebar
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((v) => !v)}
@@ -25,19 +24,13 @@ const AppLayout = ({ title, subtitle, active, onSelect, children }: AppLayoutPro
         onSelect={onSelect}
       />
       <Navbar title={title} subtitle={subtitle} sidebarWidth={sidebarWidth} />
-
-      <Box
-        component="main"
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          transition: 'margin 220ms ease',
-        }}
+      <main
+        className="flex-1 min-w-0 transition-all duration-200 ease-in-out"
+        style={{ marginLeft: sidebarWidth, paddingTop: 64 }}
       >
-        <Toolbar sx={{ minHeight: 64 }} />
         {children}
-      </Box>
-    </Box>
+      </main>
+    </div>
   );
 };
 

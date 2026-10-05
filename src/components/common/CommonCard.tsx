@@ -1,5 +1,5 @@
-import { Card, CardContent, Box, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
+import { cn } from '../../lib/cn';
 
 interface CommonCardProps {
   title?: string;
@@ -8,77 +8,27 @@ interface CommonCardProps {
   actions?: ReactNode;
   children: ReactNode;
   gradient?: boolean;
+  className?: string;
 }
 
-const CommonCard = ({
-  title,
-  subtitle,
-  icon,
-  actions,
-  children,
-  gradient = false,
-}: CommonCardProps) => {
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        overflow: 'hidden',
-        border: '1px solid',
-        borderColor: 'rgba(15, 23, 42, 0.06)',
-        boxShadow: '0 20px 60px -30px rgba(15, 23, 42, 0.2)',
-        background: gradient
-          ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
-          : '#ffffff',
-      }}
-    >
-      {(title || icon) && (
-        <Box
-          sx={{
-            px: 3,
-            py: 2.5,
-            background:
-              'linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(6, 182, 212, 0.06) 100%)',
-            borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {icon && (
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background:
-                    'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                  color: '#fff',
-                  boxShadow: '0 8px 20px -8px rgba(79, 70, 229, 0.6)',
-                }}
-              >
-                {icon}
-              </Box>
-            )}
-            <Box sx={{ flex: 1 }}>
-              {title && (
-                <Typography variant="h6" color="text.primary">
-                  {title}
-                </Typography>
-              )}
-              {subtitle && (
-                <Typography variant="body2" color="text.secondary">
-                  {subtitle}
-                </Typography>
-              )}
-            </Box>
-            {actions}
-          </Box>
-        </Box>
-      )}
-      <CardContent sx={{ p: 3 }}>{children}</CardContent>
-    </Card>
-  );
-};
+const CommonCard = ({ title, subtitle, icon, actions, children, className }: CommonCardProps) => (
+  <div className={cn('bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden', className)}>
+    {(title || icon) && (
+      <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+        {icon && (
+          <div className="w-10 h-10 rounded-lg bg-primary-600 flex items-center justify-center text-white shrink-0">
+            {icon}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          {title && <h3 className="text-base font-semibold text-slate-900">{title}</h3>}
+          {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+        </div>
+        {actions}
+      </div>
+    )}
+    <div className="p-6">{children}</div>
+  </div>
+);
 
 export default CommonCard;

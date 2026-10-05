@@ -1,19 +1,6 @@
-import {
-  Box,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import EventNoteRoundedIcon from '@mui/icons-material/EventNoteRounded';
-import MenuOpenRoundedIcon from '@mui/icons-material/MenuOpenRounded';
-import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
+import { CalendarDays, Menu, PanelLeftClose } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { cn } from '../../lib/cn';
 
 export const SIDEBAR_WIDTH_EXPANDED = 248;
 export const SIDEBAR_WIDTH_COLLAPSED = 64;
@@ -25,7 +12,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'schedules', label: 'PC Schedules', icon: <EventNoteRoundedIcon sx={{ fontSize: 20 }} /> },
+  { key: 'schedules', label: 'PC Schedules', icon: <CalendarDays className="w-5 h-5" /> },
 ];
 
 interface SidebarProps {
@@ -35,170 +22,70 @@ interface SidebarProps {
   onSelect: (key: string) => void;
 }
 
-const Sidebar = ({ open, onToggle, active, onSelect }: SidebarProps) => {
-  const width = open ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
-
-  const renderItem = (item: NavItem) => {
-    const selected = item.key === active;
-    const button = (
-      <ListItemButton
-        key={item.key}
-        selected={selected}
-        onClick={() => onSelect(item.key)}
-        sx={{
-          mx: 1,
-          my: 0.25,
-          borderRadius: 1.5,
-          minHeight: 40,
-          justifyContent: open ? 'flex-start' : 'center',
-          px: open ? 1.5 : 1.25,
-          position: 'relative',
-          color: selected ? '#fff' : 'rgba(203, 213, 225, 0.80)',
-          bgcolor: selected ? 'rgba(255,255,255,0.10)' : 'transparent',
-          borderLeft: selected ? '3px solid' : '3px solid transparent',
-          borderLeftColor: selected ? 'rgba(255,255,255,0.70)' : 'transparent',
-          pl: open ? (selected ? 'calc(12px - 3px)' : 1.5) : undefined,
-          '&:hover': {
-            bgcolor: selected
-              ? 'rgba(255,255,255,0.12)'
-              : 'rgba(255,255,255,0.05)',
-            color: '#fff',
-          },
-          '&.Mui-selected': { bgcolor: undefined },
-          transition: 'background-color 120ms ease, border-color 120ms ease',
-        }}
+const Sidebar = ({ open, onToggle, active, onSelect }: SidebarProps) => (
+  <aside
+    className="fixed top-0 left-0 h-screen flex flex-col bg-sidebar text-slate-400 z-40 overflow-hidden transition-all duration-200 ease-in-out border-r border-white/5"
+    style={{ width: open ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED }}
+  >
+    {/* Brand header */}
+    <div className={cn('h-16 flex items-center shrink-0 border-b border-white/5', open ? 'px-4 justify-between' : 'px-2 justify-center')}>
+      {open && (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded bg-primary-600 flex items-center justify-center text-white font-extrabold text-sm shrink-0">
+            PC
+          </div>
+          <div className="min-w-0">
+            <p className="text-slate-50 font-bold text-[0.9375rem] leading-tight">PCM</p>
+            <p className="text-slate-400/55 text-[0.6875rem] leading-tight">Compensation</p>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={onToggle}
+        className="p-1.5 rounded-md text-slate-400/70 hover:text-white hover:bg-white/5 transition-colors shrink-0"
+        aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
       >
-        <ListItemIcon
-          sx={{
-            minWidth: 0,
-            mr: open ? 1.5 : 0,
-            justifyContent: 'center',
-            color: 'inherit',
-          }}
-        >
-          {item.icon}
-        </ListItemIcon>
-        {open && (
-          <ListItemText
-            primary={item.label}
-            slotProps={{
-              primary: {
-                sx: {
-                  fontWeight: selected ? 600 : 400,
-                  fontSize: '0.875rem',
-                  letterSpacing: '0.01em',
-                  color: 'inherit',
-                },
-              },
-            }}
-          />
-        )}
-      </ListItemButton>
-    );
+        {open ? <PanelLeftClose className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+    </div>
 
-    return open ? (
-      button
-    ) : (
-      <Tooltip key={item.key} title={item.label} placement="right" arrow>
-        {button}
-      </Tooltip>
-    );
-  };
-
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width,
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-        transition: 'width 220ms ease',
-        '& .MuiDrawer-paper': {
-          width,
-          overflowX: 'hidden',
-          transition: 'width 220ms ease',
-          border: 'none',
-          background: '#1E293B',
-          color: '#CBD5E1',
-        },
-      }}
-    >
-      {/* Brand / logo area */}
-      <Toolbar
-        sx={{
-          minHeight: 64,
-          px: open ? 2 : 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: open ? 'space-between' : 'center',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        {open && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-            <Box
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                bgcolor: '#1A56DB',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: '0.875rem',
-                letterSpacing: '-0.5px',
-                flexShrink: 0,
-              }}
+    {/* Nav section */}
+    <div className="flex-1 flex flex-col pt-4 overflow-hidden">
+      {open && (
+        <p className="px-4 pb-2 text-[0.6875rem] font-semibold tracking-[0.08em] uppercase text-slate-400/35">
+          Navigation
+        </p>
+      )}
+      <nav className="px-2 flex flex-col gap-0.5">
+        {NAV_ITEMS.map((item) => {
+          const selected = item.key === active;
+          const btn = (
+            <button
+              key={item.key}
+              onClick={() => onSelect(item.key)}
+              title={!open ? item.label : undefined}
+              className={cn(
+                'flex items-center gap-3 w-full rounded-[6px] min-h-[40px] transition-colors duration-100 relative',
+                open ? 'px-3 justify-start' : 'px-0 justify-center',
+                selected
+                  ? 'text-white bg-white/10 border-l-[3px] border-white/70'
+                  : 'text-slate-300/80 hover:text-white hover:bg-white/5 border-l-[3px] border-transparent',
+                selected && open && 'pl-[9px]',
+              )}
             >
-              PC
-            </Box>
-            <Box>
-              <Typography sx={{ color: '#F8FAFC', fontWeight: 700, fontSize: '0.9375rem', lineHeight: 1.1 }}>
-                PCM
-              </Typography>
-              <Typography sx={{ color: 'rgba(203,213,225,0.55)', fontSize: '0.6875rem' }}>
-                Compensation
-              </Typography>
-            </Box>
-          </Box>
-        )}
-        <IconButton
-          onClick={onToggle}
-          size="small"
-          sx={{
-            color: 'rgba(203,213,225,0.70)',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.06)', color: '#fff' },
-          }}
-        >
-          {open ? <MenuOpenRoundedIcon sx={{ fontSize: 20 }} /> : <MenuRoundedIcon sx={{ fontSize: 20 }} />}
-        </IconButton>
-      </Toolbar>
-
-      {/* Nav section */}
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 2 }}>
-        {open && (
-          <Typography
-            sx={{
-              px: 2,
-              pb: 1,
-              fontSize: '0.6875rem',
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: 'rgba(203,213,225,0.35)',
-            }}
-          >
-            Navigation
-          </Typography>
-        )}
-        <List sx={{ py: 0, px: 0 }}>
-          {NAV_ITEMS.map(renderItem)}
-        </List>
-      </Box>
-    </Drawer>
-  );
-};
+              <span className="shrink-0">{item.icon}</span>
+              {open && (
+                <span className={cn('text-sm tracking-[0.01em]', selected ? 'font-semibold' : 'font-normal')}>
+                  {item.label}
+                </span>
+              )}
+            </button>
+          );
+          return btn;
+        })}
+      </nav>
+    </div>
+  </aside>
+);
 
 export default Sidebar;

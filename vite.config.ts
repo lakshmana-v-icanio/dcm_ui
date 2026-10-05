@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   base: '/DMS/awc/pcmgr/beta/',
 
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
 
   build: {
     outDir: 'dist',
@@ -21,7 +22,6 @@ export default defineConfig({
           if (info.names?.some((name) => name.endsWith('.css'))) {
             return 'assets/pc_manager.css'
           }
-
           return 'assets/[name][extname]'
         },
       },

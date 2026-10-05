@@ -1,28 +1,14 @@
 import { useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  FormControlLabel,
-  MenuItem,
-  Paper,
-  Select,
-  Stack,
-  Switch,
-  Typography,
-} from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material/Select';
-import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
-import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
-import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
-import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
+import { CloudUpload, Download, Copy, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { Alert } from '../components/ui/Alert';
+import { Button } from '../components/ui/Button';
+import { cn } from '../lib/cn';
 
 type SheetJson = Record<string, unknown>[];
 type WorkbookJson = Record<string, SheetJson>;
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 const XlsxToJson = () => {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -96,19 +82,14 @@ const XlsxToJson = () => {
     if (file) void handleFile(file);
   };
 
-  const onSheetChange = (e: SelectChangeEvent<string>) => {
-    setActiveSheet(e.target.value);
-  };
-
-  const onToggleAllSheets = (_: unknown, checked: boolean) => {
+  const onToggleAllSheets = (checked: boolean) => {
     setAllSheets(checked);
     setCopied(false);
   };
 
-  const onToggleRawHeader = async (_: unknown, checked: boolean) => {
+  const onToggleRawHeader = async (checked: boolean) => {
     setRawHeader(checked);
     setCopied(false);
-    // Re-parse currently loaded file if we have one, using new header mode.
     const file = inputRef.current?.files?.[0];
     if (file) {
       try {
@@ -164,37 +145,24 @@ const XlsxToJson = () => {
   const activeRows = workbookJson[activeSheet]?.length ?? 0;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-        XLSX → JSON Converter
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+    <div className="p-4 md:p-8 max-w-screen-xl mx-auto">
+      <h1 className="text-xl font-bold text-slate-900 mb-1">XLSX → JSON Converter</h1>
+      <p className="text-sm text-slate-500 mb-5">
         Upload a spreadsheet (.xlsx, .xls, .xlsm, .csv) to convert it to JSON. Everything runs in your browser — no upload to the server.
-      </Typography>
+      </p>
 
-      <Paper
-        variant="outlined"
+      {/* Drop zone */}
+      <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        sx={{
-          p: 4,
-          borderStyle: 'dashed',
-          borderWidth: 2,
-          borderRadius: 3,
-          textAlign: 'center',
-          background: (t) =>
-            t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(15, 23, 42, 0.02)',
-          cursor: 'pointer',
-        }}
         onClick={() => inputRef.current?.click()}
+        className="border-2 border-dashed border-slate-300 rounded-xl p-10 text-center bg-slate-50 hover:bg-blue-50/30 hover:border-primary-600 transition-colors cursor-pointer"
       >
-        <CloudUploadRoundedIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+        <CloudUpload className="w-12 h-12 text-primary-600 mx-auto mb-2" />
+        <p className="text-sm font-semibold text-slate-800">
           {fileName ? fileName : 'Click to browse or drop a spreadsheet here'}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Supported: .xlsx, .xls, .xlsm, .csv · Max 25 MB
-        </Typography>
+        </p>
+        <p className="text-xs text-slate-400 mt-1">Supported: .xlsx, .xls, .xlsm, .csv · Max 25 MB</p>
         <input
           ref={inputRef}
           type="file"
@@ -202,117 +170,101 @@ const XlsxToJson = () => {
           accept=".xlsx,.xls,.xlsm,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
           onChange={onInputChange}
         />
-      </Paper>
+      </div>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div className="mt-3">
+          <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>
+        </div>
       )}
 
       {sheetNames.length > 0 && (
         <>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{
-              mt: 3,
-              mb: 2,
-              alignItems: { xs: 'stretch', md: 'center' },
-            }}
-          >
-            <Box sx={{ minWidth: 220 }}>
-              <Typography variant="caption" color="text.secondary">
-                Sheet
-              </Typography>
-              <Select
-                fullWidth
-                size="small"
+          <div className="mt-4 mb-3 flex flex-wrap gap-3 items-center">
+            {/* Sheet selector */}
+            <div className="flex flex-col gap-1 min-w-[200px]">
+              <span className="text-xs text-slate-500 font-medium">Sheet</span>
+              <select
                 value={activeSheet}
-                onChange={onSheetChange}
+                onChange={(e) => setActiveSheet(e.target.value)}
                 disabled={allSheets}
+                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600 disabled:opacity-50 disabled:cursor-not-allowed bg-white"
               >
                 {sheetNames.map((n) => (
-                  <MenuItem key={n} value={n}>
+                  <option key={n} value={n}>
                     {n} ({workbookJson[n]?.length ?? 0})
-                  </MenuItem>
+                  </option>
                 ))}
-              </Select>
-            </Box>
-            <FormControlLabel
-              control={<Switch checked={allSheets} onChange={onToggleAllSheets} />}
-              label="Export all sheets"
-            />
-            <FormControlLabel
-              control={<Switch checked={rawHeader} onChange={onToggleRawHeader} />}
-              label="Rows as arrays (no header row)"
-            />
-            <Box sx={{ flex: 1 }} />
-            <Chip
-              label={
-                allSheets
-                  ? `${sheetNames.length} sheets`
-                  : `${activeRows} rows`
-              }
-              size="small"
-            />
+              </select>
+            </div>
+
+            {/* Toggles */}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allSheets}
+                onChange={(e) => onToggleAllSheets(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary-600 accent-primary-600"
+              />
+              <span className="text-sm text-slate-700">Export all sheets</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rawHeader}
+                onChange={(e) => void onToggleRawHeader(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary-600 accent-primary-600"
+              />
+              <span className="text-sm text-slate-700">Rows as arrays (no header row)</span>
+            </label>
+
+            <div className="flex-1" />
+
+            {/* Row count badge */}
+            <span className={cn(
+              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+              'bg-slate-100 text-slate-600'
+            )}>
+              {allSheets ? `${sheetNames.length} sheets` : `${activeRows} rows`}
+            </span>
+
             <Button
               size="small"
-              startIcon={<ContentCopyRoundedIcon />}
-              onClick={copyJson}
               variant="outlined"
+              startIcon={<Copy className="w-3.5 h-3.5" />}
+              onClick={() => void copyJson()}
               disabled={busy}
             >
               {copied ? 'Copied!' : 'Copy JSON'}
             </Button>
             <Button
               size="small"
-              startIcon={<DownloadRoundedIcon />}
-              onClick={downloadJson}
               variant="contained"
+              startIcon={<Download className="w-3.5 h-3.5" />}
+              onClick={downloadJson}
               disabled={busy}
             >
               Download
             </Button>
             <Button
               size="small"
-              startIcon={<RestartAltRoundedIcon />}
+              variant="text"
+              startIcon={<RotateCcw className="w-3.5 h-3.5" />}
               onClick={reset}
-              color="inherit"
             >
               Reset
             </Button>
-          </Stack>
+          </div>
 
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2,
-              borderRadius: 2,
-              maxHeight: 520,
-              overflow: 'auto',
-              background: (t) =>
-                t.palette.mode === 'dark' ? '#0f172a' : '#0f172a',
-              color: '#e2e8f0',
-            }}
-          >
-            <Box
-              component="pre"
-              sx={{
-                m: 0,
-                fontFamily:
-                  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                fontSize: 12.5,
-                lineHeight: 1.55,
-                whiteSpace: 'pre',
-              }}
-            >
+          {/* JSON output */}
+          <div className="rounded-xl border border-slate-700 bg-slate-900 overflow-auto max-h-[520px] p-4">
+            <pre className="m-0 text-slate-200 font-mono text-xs leading-relaxed whitespace-pre">
               {jsonText}
-            </Box>
-          </Paper>
+            </pre>
+          </div>
         </>
       )}
-    </Box>
+    </div>
   );
 };
 

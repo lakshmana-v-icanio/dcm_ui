@@ -1,31 +1,12 @@
 import { useEffect, useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  MenuItem,
-  Alert,
-  Grid,
-  Typography,
-  Chip,
-  CircularProgress,
-  Divider,
-  InputAdornment,
-  IconButton,
-  Box,
-} from '@mui/material';
-import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
-import CategoryRoundedIcon from '@mui/icons-material/CategoryRounded';
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
-import EventNoteRoundedIcon from '@mui/icons-material/EventNoteRounded';
-import RestartAltRoundedIcon from '@mui/icons-material/RestartAltRounded';
-import RocketLaunchRoundedIcon from '@mui/icons-material/RocketLaunchRounded';
-
+import { CalendarRange, Tag, FileText, CalendarDays, RotateCcw, Rocket } from 'lucide-react';
 import CommonTextInput from '../components/common/CommonTextInput';
 import ProductPicker from '../components/common/ProductPicker';
+import { Dialog, DialogHeader, DialogBody, DialogFooter } from '../components/ui/Dialog';
+import { Button } from '../components/ui/Button';
+import { Alert } from '../components/ui/Alert';
+import { Spinner } from '../components/ui/Spinner';
+import { Badge } from '../components/ui/Badge';
 import {
   createPcSchedule,
   type CreatePcScheduleRequest,
@@ -63,7 +44,6 @@ const ScheduleFormDialog = ({ open, onClose, onCreated }: ScheduleFormDialogProp
   const [serverError, setServerError] = useState<string | null>(null);
 
   const isPce = form.scheduleType === 'PCE';
-  const isVested = form.scheduleType === 'VestedComp';
 
   useEffect(() => {
     if (!open) {
@@ -84,16 +64,10 @@ const ScheduleFormDialog = ({ open, onClose, onCreated }: ScheduleFormDialogProp
     if (!form.scheduleType) next.scheduleType = 'Schedule type is required';
     if (!form.startDate) next.startDate = 'Start date is required';
     if (!form.endDate) next.endDate = 'End date is required';
-    if (
-      form.startDate &&
-      form.endDate &&
-      new Date(form.startDate) > new Date(form.endDate)
-    ) {
+    if (form.startDate && form.endDate && new Date(form.startDate) > new Date(form.endDate)) {
       next.endDate = 'End date must be after start date';
     }
-    if (isPce && !form.product) {
-      next.product = 'A project must be mapped for PCE schedules';
-    }
+    if (isPce && !form.product) next.product = 'A project must be mapped for PCE schedules';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -101,7 +75,6 @@ const ScheduleFormDialog = ({ open, onClose, onCreated }: ScheduleFormDialogProp
   const handleSubmit = async () => {
     setServerError(null);
     if (!validate()) return;
-
     const payload: CreatePcScheduleRequest = {
       scheduleType: form.scheduleType as ScheduleType,
       startDate: form.startDate,
@@ -109,7 +82,6 @@ const ScheduleFormDialog = ({ open, onClose, onCreated }: ScheduleFormDialogProp
       description: form.description || undefined,
       productGid: isPce && form.product ? form.product.gid : undefined,
     };
-
     setSubmitting(true);
     try {
       const result = await createPcSchedule(payload);
@@ -117,232 +89,103 @@ const ScheduleFormDialog = ({ open, onClose, onCreated }: ScheduleFormDialogProp
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } }; message?: string })
-          .response?.data?.message ??
-        (err as { message?: string }).message ??
-        'Failed to create schedule';
+          .response?.data?.message ?? (err as { message?: string }).message ?? 'Failed to create schedule';
       setServerError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleReset = () => {
-    setForm(emptyForm);
-    setErrors({});
-    setServerError(null);
-  };
-
   return (
-    <Dialog
-      open={open}
-      onClose={submitting ? undefined : onClose}
-      maxWidth="md"
-      fullWidth
-      slotProps={{ paper: { sx: { borderRadius: 3 } } }}
-    >
-      <DialogTitle
-        sx={{
-          background:
-            'linear-gradient(135deg, rgba(79, 70, 229, 0.10) 0%, rgba(6, 182, 212, 0.08) 100%)',
-          borderBottom: '1px solid rgba(15, 23, 42, 0.06)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          pr: 6,
-        }}
-      >
-        <Box
-          sx={{
-            width: 44,
-            height: 44,
-            borderRadius: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-            color: '#fff',
-            boxShadow: '0 8px 20px -8px rgba(79, 70, 229, 0.6)',
-          }}
-        >
-          <EventNoteRoundedIcon />
-        </Box>
-        <Box>
-          <Typography variant="h6">Create PC Schedule</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Auto-generates the Calculation Base and Integration Map
-          </Typography>
-        </Box>
-        <IconButton
-          onClick={onClose}
-          disabled={submitting}
-          sx={{ position: 'absolute', right: 12, top: 12 }}
-        >
-          <CloseRoundedIcon />
-        </IconButton>
-      </DialogTitle>
+    <Dialog open={open} onClose={submitting ? () => {} : onClose} maxWidth="md">
+      <DialogHeader
+        title="Create PC Schedule"
+        subtitle="Auto-generates the Calculation Base and Integration Map"
+        onClose={submitting ? undefined : onClose}
+      />
+      <DialogBody>
+        {serverError && <Alert severity="error" className="mb-4">{serverError}</Alert>}
 
-      <DialogContent dividers sx={{ p: 3 }}>
-        {serverError && (
-          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-            {serverError}
-          </Alert>
-        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CommonTextInput
+            select
+            required
+            label="Schedule Type"
+            value={form.scheduleType}
+            onChange={(e) => update('scheduleType', e.target.value as ScheduleType)}
+            error={!!errors.scheduleType}
+            helperText={errors.scheduleType ?? (isPce ? 'A project (Product) must be mapped for PCE' : form.scheduleType === 'VestedComp' ? 'Product is not applicable for VESTED' : ' ')}
+            slotProps={{ input: { startAdornment: <Tag className="w-4 h-4" /> } }}
+          >
+            <option value="">Select type…</option>
+            <option value="PCE">PCE — Product Compensation</option>
+            <option value="VestedComp">VESTED — Vested Compensation</option>
+          </CommonTextInput>
 
-        <Grid container spacing={3} sx={{ mt: 0 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <CommonTextInput
-              select
-              required
-              label="Schedule Type"
-              value={form.scheduleType}
-              onChange={(e) => update('scheduleType', e.target.value as ScheduleType)}
-              error={!!errors.scheduleType}
-              helperText={
-                errors.scheduleType ??
-                (isPce
-                  ? 'A project (Product) must be mapped for PCE'
-                  : isVested
-                    ? 'Product is not applicable for VESTED'
-                    : ' ')
-              }
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CategoryRoundedIcon color="action" fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            >
-              <MenuItem value="PCE">PCE — Product Compensation</MenuItem>
-              <MenuItem value="VestedComp">VESTED — Vested Compensation</MenuItem>
-            </CommonTextInput>
-          </Grid>
+          <CommonTextInput
+            label="Description"
+            placeholder="Optional summary shown on schedule list"
+            value={form.description}
+            onChange={(e) => update('description', e.target.value)}
+            slotProps={{ input: { startAdornment: <FileText className="w-4 h-4" /> } }}
+          />
 
-          <Grid size={{ xs: 12, md: 6 }}>
-            <CommonTextInput
-              label="Description"
-              placeholder="Optional summary shown on schedule list"
-              value={form.description}
-              onChange={(e) => update('description', e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <DescriptionRoundedIcon color="action" fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-          </Grid>
+          <CommonTextInput
+            required
+            type="date"
+            label="Start Date"
+            value={form.startDate}
+            onChange={(e) => update('startDate', e.target.value)}
+            error={!!errors.startDate}
+            helperText={errors.startDate ?? ' '}
+            slotProps={{ input: { startAdornment: <CalendarDays className="w-4 h-4" /> } }}
+          />
 
-          <Grid size={{ xs: 12, md: 6 }}>
-            <CommonTextInput
-              required
-              type="date"
-              label="Start Date"
-              value={form.startDate}
-              onChange={(e) => update('startDate', e.target.value)}
-              error={!!errors.startDate}
-              helperText={errors.startDate ?? ' '}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarMonthRoundedIcon color="action" fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <CommonTextInput
-              required
-              type="date"
-              label="End Date"
-              value={form.endDate}
-              onChange={(e) => update('endDate', e.target.value)}
-              error={!!errors.endDate}
-              helperText={errors.endDate ?? ' '}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarMonthRoundedIcon color="action" fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
-          </Grid>
+          <CommonTextInput
+            required
+            type="date"
+            label="End Date"
+            value={form.endDate}
+            onChange={(e) => update('endDate', e.target.value)}
+            error={!!errors.endDate}
+            helperText={errors.endDate ?? ' '}
+            slotProps={{ input: { startAdornment: <CalendarRange className="w-4 h-4" /> } }}
+          />
 
           {isPce && (
-            <>
-              <Grid size={{ xs: 12 }}>
-                <Divider textAlign="left" sx={{ my: 1 }}>
-                  <Chip
-                    size="small"
-                    label="Project Mapping (Required)"
-                    color="primary"
-                    sx={{ fontWeight: 600 }}
-                  />
-                </Divider>
-              </Grid>
-
-              <Grid size={{ xs: 12 }}>
-                <ProductPicker
-                  value={form.product}
-                  onChange={(product) => update('product', product)}
-                  required
-                  error={!!errors.product}
-                  helperText={
-                    errors.product ??
-                    'Search and select the project to map — required for PCE schedules'
-                  }
-                />
-              </Grid>
-            </>
+            <div className="col-span-full">
+              <div className="flex items-center gap-2 my-2">
+                <hr className="flex-1 border-slate-200" />
+                <Badge label="Project Mapping (Required)" tone="primary" />
+                <hr className="flex-1 border-slate-200" />
+              </div>
+              <ProductPicker
+                value={form.product}
+                onChange={(product) => update('product', product)}
+                required
+                error={!!errors.product}
+                helperText={errors.product ?? 'Search and select the project to map — required for PCE schedules'}
+              />
+            </div>
           )}
-        </Grid>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button
-          variant="text"
-          color="inherit"
-          startIcon={<RestartAltRoundedIcon />}
-          onClick={handleReset}
-          disabled={submitting}
-        >
+        </div>
+      </DialogBody>
+      <DialogFooter>
+        <Button variant="text" color="inherit" startIcon={<RotateCcw className="w-4 h-4" />} onClick={() => { setForm(emptyForm); setErrors({}); setServerError(null); }} disabled={submitting}>
           Reset
         </Button>
-        <Button onClick={onClose} disabled={submitting} color="inherit">
-          Cancel
-        </Button>
+        <Button variant="text" color="inherit" onClick={onClose} disabled={submitting}>Cancel</Button>
         <Button
           variant="contained"
+          color="primary"
           size="large"
-          startIcon={
-            submitting ? (
-              <CircularProgress size={18} color="inherit" />
-            ) : (
-              <RocketLaunchRoundedIcon />
-            )
-          }
+          startIcon={submitting ? <Spinner size={16} color="white" /> : <Rocket className="w-4 h-4" />}
           onClick={handleSubmit}
           disabled={submitting}
-          sx={{
-            background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-            minWidth: 180,
-          }}
         >
           {submitting ? 'Creating…' : 'Create Schedule'}
         </Button>
-      </DialogActions>
+      </DialogFooter>
     </Dialog>
   );
 };

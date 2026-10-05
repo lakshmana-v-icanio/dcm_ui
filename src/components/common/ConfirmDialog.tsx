@@ -1,13 +1,6 @@
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-} from '@mui/material';
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
+import { AlertTriangle } from 'lucide-react';
+import { Dialog, DialogHeader, DialogBody, DialogFooter } from '../ui/Dialog';
+import { Button } from '../ui/Button';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -15,16 +8,11 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** 'error' for destructive/leave actions, 'primary' otherwise. */
   confirmColor?: 'error' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-/**
- * A styled confirmation popup used in place of the browser's native `window.confirm`.
- * Async by nature — the caller keeps the pending action and runs it in `onConfirm`.
- */
 const ConfirmDialog = ({
   open,
   title = 'Please confirm',
@@ -35,23 +23,23 @@ const ConfirmDialog = ({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) => (
-  <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
-    <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
-      <WarningAmberRoundedIcon color="warning" />
-      {title}
-    </DialogTitle>
-    <DialogContent>
-      <DialogContentText sx={{ color: 'text.primary' }}>{message}</DialogContentText>
-    </DialogContent>
-    <DialogActions sx={{ px: 3, pb: 2 }}>
-      <Box sx={{ flex: 1 }} />
-      <Button onClick={onCancel} variant="outlined" autoFocus>
+  <Dialog open={open} onClose={onCancel} maxWidth="xs">
+    <DialogHeader
+      title={title}
+      icon={<AlertTriangle className="w-5 h-5" />}
+      onClose={onCancel}
+    />
+    <DialogBody>
+      <p className="text-sm text-slate-700">{message}</p>
+    </DialogBody>
+    <DialogFooter>
+      <Button variant="outlined" color="inherit" onClick={onCancel} autoFocus>
         {cancelLabel}
       </Button>
-      <Button onClick={onConfirm} color={confirmColor} variant="contained">
+      <Button variant="contained" color={confirmColor} onClick={onConfirm}>
         {confirmLabel}
       </Button>
-    </DialogActions>
+    </DialogFooter>
   </Dialog>
 );
 

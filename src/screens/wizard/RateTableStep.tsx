@@ -1,43 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Chip,
-  CircularProgress,
-  Divider,
-  IconButton,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Paper,
-  Snackbar,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import DriveFileRenameOutlineRoundedIcon from '@mui/icons-material/DriveFileRenameOutlineRounded';
-import EditRoundedIcon from '@mui/icons-material/EditRounded';
-import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
-import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
+import { Upload, Pencil, Save, X, Plus, Trash2, PenLine, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import {
-  BrandButton,
-  DropZone,
-  StyledTableHeadRow,
-  SurfaceCard,
-} from '../../theme/styled';
+import { Button } from '../../components/ui/Button';
+import { Alert } from '../../components/ui/Alert';
+import { Snackbar } from '../../components/ui/Snackbar';
+import { Spinner } from '../../components/ui/Spinner';
+import { Tooltip } from '../../components/ui/Tooltip';
+import { cn } from '../../lib/cn';
 import {
   getScheduleRateTables,
   getScheduleVariables,
@@ -56,11 +27,9 @@ type AxisKind = 'CONTINUOUS' | 'DATE' | 'STRING' | 'DISCRETE';
 
 export interface ParsedTable {
   id: string;
-  /** Filename without extension — becomes the tab label. */
   name: string;
   headers: string[];
   rows: string[][];
-  /** True for tables loaded from the server (persisted) — shown read-only. */
   readOnly?: boolean;
   tableGid?: string;
   sourceDto?: RateTableDto;
@@ -98,11 +67,11 @@ const KIND_LABEL: Record<AxisKind, string> = {
   STRING: 'Text',
 };
 
-const KIND_COLOR: Record<AxisKind, 'primary' | 'default' | 'success' | 'warning'> = {
-  CONTINUOUS: 'primary',
-  DISCRETE: 'default',
-  DATE: 'success',
-  STRING: 'warning',
+const KIND_BADGE: Record<AxisKind, string> = {
+  CONTINUOUS: 'bg-blue-100 text-blue-700',
+  DISCRETE: 'bg-slate-100 text-slate-600',
+  DATE: 'bg-green-100 text-green-700',
+  STRING: 'bg-amber-100 text-amber-700',
 };
 
 /* ======================================================================= */
@@ -125,13 +94,8 @@ export const summariseTableNames = (tables: ParsedTable[]): string => {
 /*  Private helpers                                                         */
 /* ======================================================================= */
 
-/** Only Excel workbooks are accepted — CSV (and anything else) is rejected. */
 const isExcelFile = (filename: string): boolean => /\.xlsx?$/i.test(filename);
 
-/**
- * Return a name unique against `taken` (case-insensitive). On a collision it
- * appends `_1`, `_2`, … so a re-uploaded file shows as `Filename_1`, `Filename_2`.
- */
 const makeUniqueName = (base: string, taken: Set<string>): string => {
   if (!taken.has(base.toLowerCase())) return base;
   let n = 1;
@@ -139,7 +103,6 @@ const makeUniqueName = (base: string, taken: Set<string>): string => {
   return `${base}_${n}`;
 };
 
-/** Classify a free-form variable name into a kind using name-pattern heuristics. */
 const classifyVariableKind = (name: string): AxisKind => {
   const n = name.toLowerCase().replace(/[\s_-]/g, '');
   if (/date|dob|birth|effective|expiry|expir|inception|issued|start|end/.test(n)) return 'DATE';
@@ -229,7 +192,7 @@ const parseWorkbook = async (file: File): Promise<ParsedTable[]> => {
     });
     if (rows.length === 0) return;
     const rawHeaderRow = (rows[0] ?? []).map(cellToString);
-    const rawBodyRows = rows.slice(1).map((r) => r.map(cellToString));
+    const rawBodyRows = rows.slice(1).map((r) => (r as unknown[]).map(cellToString));
     while (rawBodyRows.length > 0 && rawBodyRows[rawBodyRows.length - 1].every((c) => c === '')) {
       rawBodyRows.pop();
     }
@@ -284,7 +247,6 @@ const RateTableStep = ({
   const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Edit-mode state
   const [editingGid, setEditingGid] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<ParsedTable | null>(null);
   const [editingMeta, setEditingMeta] = useState<RateTableMeta | null>(null);
@@ -508,7 +470,6 @@ const RateTableStep = ({
     });
   };
 
-  /** Called when the user commits a free-form name for a new (blank) axis. */
   const handleAxisNameCommit = (axisIdx: number, name: string) => {
     if (!editingData || !editingAxes) return;
     const kind = classifyVariableKind(name);
@@ -549,22 +510,19 @@ const RateTableStep = ({
   /* ---- render -------------------------------------------------------- */
 
   return (
-    <Box>
-      <DropZone
-        variant="outlined"
+    <div>
+      {/* Drop zone */}
+      <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+        className="border-2 border-dashed border-slate-300 rounded-xl p-10 flex flex-col items-center text-center bg-slate-50 hover:bg-blue-50/30 hover:border-primary-600 transition-colors cursor-default"
       >
-        <UploadFileRoundedIcon color="primary" fontSize="large" />
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>
-          Drop your rate table files here
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Multiple files supported · .xlsx, .xls
-        </Typography>
-        <BrandButton variant="contained" onClick={() => fileInputRef.current?.click()}>
+        <Upload className="w-10 h-10 text-primary-600 mb-2" />
+        <p className="text-sm font-semibold text-slate-800 mt-1">Drop your rate table files here</p>
+        <p className="text-xs text-slate-500 mt-1 mb-4">Multiple files supported · .xlsx, .xls</p>
+        <Button variant="contained" onClick={() => fileInputRef.current?.click()}>
           Browse files
-        </BrandButton>
+        </Button>
         <input
           ref={fileInputRef}
           hidden
@@ -574,24 +532,22 @@ const RateTableStep = ({
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
         />
         {uploadedFileName && (
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-            <Chip
-              label={`${tables.length} table${tables.length === 1 ? '' : 's'} loaded`}
-              color="primary"
-              variant="outlined"
-            />
-          </Box>
+          <div className="mt-3">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+              {tables.length} table{tables.length === 1 ? '' : 's'} loaded
+            </span>
+          </div>
         )}
-      </DropZone>
+      </div>
 
       {error && (
-        <Box sx={{ mt: 3 }}>
+        <div className="mt-3">
           <Alert severity="error" variant="outlined">{error}</Alert>
-        </Box>
+        </div>
       )}
 
       {displayTables.length > 0 && (
-        <Box sx={{ mt: 3 }}>
+        <div className="mt-3">
           <TabStrip
             tables={displayTables}
             activeId={active?.id ?? null}
@@ -613,11 +569,7 @@ const RateTableStep = ({
           )}
 
           {activeIsEditing && hasStructuralChange && (
-            <Alert
-              severity="warning"
-              icon={<WarningAmberRoundedIcon fontSize="small" />}
-              sx={{ mb: 1.5, borderRadius: 2 }}
-            >
+            <Alert severity="warning" icon={<AlertTriangle className="w-4 h-4" />} className="mb-2">
               Adding, removing, or changing axis types triggers a full axis rebuild on save —
               all existing bucket assignments will be rewritten.
             </Alert>
@@ -638,7 +590,7 @@ const RateTableStep = ({
               onDeleteRow={handleDeleteRow}
             />
           )}
-        </Box>
+        </div>
       )}
 
       <Snackbar
@@ -651,12 +603,11 @@ const RateTableStep = ({
           onClose={() => setToast(null)}
           severity={toast?.severity ?? 'info'}
           variant="filled"
-          sx={{ borderRadius: 2 }}
         >
           {toast?.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </div>
   );
 };
 
@@ -688,24 +639,23 @@ const TabStrip = ({
   const commitRename = (id: string) => { onRename?.(id, draft); setRenamingId(null); };
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+    <div className="border border-slate-200 rounded-xl p-3 mb-2 flex flex-wrap gap-2 items-center bg-white">
       {tables.map((t) => {
         const isActive = t.id === activeId;
         const isEditing = !!t.tableGid && t.tableGid === editingGid;
         const isRenaming = renamingId === t.id;
         return (
-          <Box
+          <div
             key={t.id}
             onClick={() => !isRenaming && onSelect(t.id)}
-            sx={(theme) => ({
-              display: 'flex', alignItems: 'center', gap: 0.5,
-              px: 1.5, py: 0.75, borderRadius: 1.5, cursor: 'pointer', border: '1px solid',
-              borderColor: isEditing ? theme.palette.warning.main : isActive ? theme.palette.primary.main : 'rgba(15,23,42,0.12)',
-              background: isEditing ? 'rgba(245,158,11,0.06)' : isActive ? 'rgba(79,70,229,0.06)' : theme.palette.background.paper,
-              color: isEditing ? 'warning.dark' : isActive ? 'primary.main' : 'text.primary',
-              fontWeight: isActive || isEditing ? 700 : 500,
-              transition: 'all 120ms ease',
-            })}
+            className={cn(
+              'flex items-center gap-1 px-3 py-1.5 rounded-lg cursor-pointer border text-sm transition-all',
+              isEditing
+                ? 'border-amber-400 bg-amber-50 text-amber-800 font-bold'
+                : isActive
+                ? 'border-primary-600 bg-blue-50 text-primary-600 font-bold'
+                : 'border-slate-200 bg-white text-slate-700 font-medium hover:border-slate-300',
+            )}
           >
             {isRenaming ? (
               <input
@@ -718,27 +668,25 @@ const TabStrip = ({
                   if (e.key === 'Enter') commitRename(t.id);
                   else if (e.key === 'Escape') setRenamingId(null);
                 }}
-                style={{
-                  border: '1px solid #4f46e5', borderRadius: 4, padding: '2px 6px',
-                  fontSize: 13, fontFamily: 'inherit', minWidth: 160, outline: 'none',
-                }}
+                className="border border-primary-600 rounded px-1.5 py-0.5 text-xs font-normal min-w-[160px] outline-none focus:ring-2 focus:ring-primary-600/20"
               />
             ) : (
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 'inherit' }}
+              <span
                 onDoubleClick={!t.readOnly && onRename ? (e) => { e.stopPropagation(); startRename(t); } : undefined}
               >
                 {t.name}
-              </Typography>
+              </span>
             )}
 
             {/* Saved table — enter edit mode */}
             {t.readOnly && !isEditing && t.tableGid && !isRenaming && (
               <Tooltip title="Edit this rate table">
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(t.tableGid!); }}>
-                  <EditRoundedIcon fontSize="small" />
-                </IconButton>
+                <button
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                  onClick={(e) => { e.stopPropagation(); onEdit(t.tableGid!); }}
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
               </Tooltip>
             )}
 
@@ -746,16 +694,22 @@ const TabStrip = ({
             {isEditing && !isRenaming && (
               <>
                 <Tooltip title="Save changes">
-                  <span>
-                    <IconButton size="small" color="warning" disabled={isSaving} onClick={(e) => { e.stopPropagation(); onSave(); }}>
-                      {isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveRoundedIcon fontSize="small" />}
-                    </IconButton>
-                  </span>
+                  <button
+                    disabled={isSaving}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-amber-100 text-amber-700 disabled:opacity-50"
+                    onClick={(e) => { e.stopPropagation(); onSave(); }}
+                  >
+                    {isSaving ? <Spinner size={12} /> : <Save className="w-3 h-3" />}
+                  </button>
                 </Tooltip>
                 <Tooltip title="Cancel editing">
-                  <IconButton size="small" disabled={isSaving} onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}>
-                    <CloseRoundedIcon fontSize="small" />
-                  </IconButton>
+                  <button
+                    disabled={isSaving}
+                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-slate-500 disabled:opacity-50"
+                    onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </Tooltip>
               </>
             )}
@@ -765,24 +719,30 @@ const TabStrip = ({
               <>
                 {onRename && (
                   <Tooltip title="Rename this table">
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); startRename(t); }}>
-                      <DriveFileRenameOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
+                    <button
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                      onClick={(e) => { e.stopPropagation(); startRename(t); }}
+                    >
+                      <PenLine className="w-3 h-3" />
+                    </button>
                   </Tooltip>
                 )}
                 {onRemove && (
                   <Tooltip title="Remove this table">
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onRemove(t.id); }}>
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
+                    <button
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                      onClick={(e) => { e.stopPropagation(); onRemove(t.id); }}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   </Tooltip>
                 )}
               </>
             )}
-          </Box>
+          </div>
         );
       })}
-    </Paper>
+    </div>
   );
 };
 
@@ -796,36 +756,50 @@ interface EditMetaPanelProps {
 }
 
 const EditMetaPanel = ({ meta, onChange }: EditMetaPanelProps) => (
-  <Paper variant="outlined" sx={{ mb: 1.5, borderColor: 'warning.light', borderRadius: 2, overflow: 'hidden' }}>
-    <Box sx={{ px: 2, py: 0.75, bgcolor: 'rgba(245,158,11,0.06)', borderBottom: '1px solid', borderColor: 'warning.light', display: 'flex', alignItems: 'center', gap: 1 }}>
-      <EditRoundedIcon sx={{ fontSize: 14, color: 'warning.dark' }} />
-      <Typography variant="caption" sx={{ color: 'warning.dark', fontWeight: 700 }}>Table Details</Typography>
-    </Box>
-    <Box sx={{ p: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-      <TextField
-        label="Name" size="small" value={meta.name}
-        onChange={(e) => onChange({ name: e.target.value })}
-        sx={{ flex: '1 1 200px' }} slotProps={{ inputLabel: { shrink: true } }}
-      />
-      <TextField
-        label="Comment" size="small" value={meta.comment}
-        onChange={(e) => onChange({ comment: e.target.value })}
-        sx={{ flex: '2 1 280px' }} slotProps={{ inputLabel: { shrink: true } }}
-        placeholder="Optional description"
-      />
-      <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />
-      <TextField
-        label="Start Date" type="date" size="small" value={meta.startDate}
-        onChange={(e) => onChange({ startDate: e.target.value })}
-        slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 160 }}
-      />
-      <TextField
-        label="End Date" type="date" size="small" value={meta.endDate}
-        onChange={(e) => onChange({ endDate: e.target.value })}
-        slotProps={{ inputLabel: { shrink: true } }} sx={{ width: 160 }}
-      />
-    </Box>
-  </Paper>
+  <div className="mb-2 border border-amber-200 rounded-xl overflow-hidden">
+    <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+      <Pencil className="w-3 h-3 text-amber-700" />
+      <span className="text-xs font-bold text-amber-800">Table Details</span>
+    </div>
+    <div className="p-3 flex flex-wrap gap-3 bg-white">
+      <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
+        <span className="text-xs font-medium text-slate-600">Name</span>
+        <input
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
+          value={meta.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+      </label>
+      <label className="flex flex-col gap-1 flex-[2_1_280px]">
+        <span className="text-xs font-medium text-slate-600">Comment</span>
+        <input
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
+          value={meta.comment}
+          onChange={(e) => onChange({ comment: e.target.value })}
+          placeholder="Optional description"
+        />
+      </label>
+      <div className="hidden sm:block w-px bg-slate-200 self-stretch" />
+      <label className="flex flex-col gap-1 w-40">
+        <span className="text-xs font-medium text-slate-600">Start Date</span>
+        <input
+          type="date"
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
+          value={meta.startDate}
+          onChange={(e) => onChange({ startDate: e.target.value })}
+        />
+      </label>
+      <label className="flex flex-col gap-1 w-40">
+        <span className="text-xs font-medium text-slate-600">End Date</span>
+        <input
+          type="date"
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-600"
+          value={meta.endDate}
+          onChange={(e) => onChange({ endDate: e.target.value })}
+        />
+      </label>
+    </div>
+  </div>
 );
 
 /* ======================================================================= */
@@ -859,12 +833,12 @@ const SheetGrid = ({
   onAddRow,
   onDeleteRow,
 }: SheetGridProps) => {
-  const [axisMenu, setAxisMenu] = useState<{ anchor: HTMLElement; axisIdx: number } | null>(null);
+  const [axisMenu, setAxisMenu] = useState<{ axisIdx: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const valueColIdx = table.headers.lastIndexOf('Value');
   const axisColCount = valueColIdx >= 0 ? valueColIdx : table.headers.length;
 
-  // Same-kind variables available for swapping an already-assigned axis
   const changeCompatibleVars = useMemo(() => {
     if (!axisMenu || !editingAxes) return [];
     const currentAxis = editingAxes[axisMenu.axisIdx];
@@ -877,47 +851,62 @@ const SheetGrid = ({
     );
   }, [axisMenu, editingAxes, allVariables]);
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!axisMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setAxisMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [axisMenu]);
+
   const extraCols = editable ? 2 : 0;
 
   return (
-    <SurfaceCard elevation={0}>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       {editable && (
-        <Box sx={{ px: 2, py: 0.75, borderBottom: '1px solid', borderColor: 'warning.light', bgcolor: 'rgba(245,158,11,0.04)', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <EditRoundedIcon sx={{ fontSize: 14, color: 'warning.dark' }} />
-          <Typography variant="caption" sx={{ color: 'warning.dark', fontWeight: 600 }}>
+        <div className="px-3 py-2 border-b border-amber-200 bg-amber-50 flex items-center gap-2">
+          <Pencil className="w-3 h-3 text-amber-700" />
+          <span className="text-xs font-semibold text-amber-800">
             Editing — click axis headers to change variable · click cells to edit values
-          </Typography>
-        </Box>
+          </span>
+        </div>
       )}
 
-      <TableContainer sx={{ maxHeight: 480 }}>
-        <Table stickyHeader size="small">
-          <TableHead>
-            <StyledTableHeadRow>
-              <TableCell sx={{ width: 48 }}>#</TableCell>
+      <div className="overflow-auto max-h-[480px]">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-primary-600 text-white">
+              <th className="px-3 py-2 text-left font-semibold w-12 text-xs">#</th>
 
               {table.headers.map((h, i) => {
                 const isAxisCol = i < axisColCount;
                 if (!editable || !isAxisCol) {
-                  return <TableCell key={`h-${i}`}>{h}</TableCell>;
+                  return (
+                    <th key={`h-${i}`} className="px-3 py-2 text-left font-semibold text-xs whitespace-nowrap">
+                      {h}
+                    </th>
+                  );
                 }
                 const ax = editingAxes?.[i];
 
-                // Blank new axis → inline free-form text input, AI classifies kind on commit
+                // Blank new axis → inline free-form text input
                 if (!h) {
                   return (
-                    <TableCell key={`h-${i}`} sx={{ minWidth: 180, p: '4px 8px' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box
-                          component="input"
+                    <th key={`h-${i}`} className="px-2 py-1 min-w-[180px]">
+                      <div className="flex items-center gap-1">
+                        <input
                           autoFocus
                           placeholder="Variable name…"
-                          onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                          onBlur={(e) => {
                             const name = e.target.value.trim();
                             if (name) onAxisNameCommit?.(i, name);
                             else onAxisDelete?.(i);
                           }}
-                          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               const name = e.currentTarget.value.trim();
                               if (name) { onAxisNameCommit?.(i, name); (e.target as HTMLInputElement).blur(); }
@@ -925,182 +914,161 @@ const SheetGrid = ({
                             }
                             if (e.key === 'Escape') onAxisDelete?.(i);
                           }}
-                          sx={{
-                            flex: 1, minWidth: 100, px: 1, py: 0.5,
-                            border: '1px solid', borderColor: 'warning.main', borderRadius: 1,
-                            fontSize: '0.8125rem', fontFamily: 'inherit', fontWeight: 700,
-                            outline: 'none', background: 'rgba(245,158,11,0.06)', color: 'text.primary',
-                            '&::placeholder': { color: 'text.disabled', fontStyle: 'italic', fontWeight: 400 },
-                          }}
+                          className="flex-1 min-w-[100px] px-2 py-0.5 border border-amber-400 rounded text-xs font-bold bg-amber-50/80 text-slate-900 outline-none placeholder:text-slate-400 placeholder:italic placeholder:font-normal"
                         />
-                        <Tooltip title="Cancel">
-                          <IconButton size="small" sx={{ width: 20, height: 20 }} onClick={() => onAxisDelete?.(i)}>
-                            <CloseRoundedIcon sx={{ fontSize: 12 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
+                        <button
+                          className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 text-white/80"
+                          onClick={() => onAxisDelete?.(i)}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </th>
                   );
                 }
 
-                // Assigned axis → show kind chip + name + change/delete controls
+                // Assigned axis → show kind badge + name + change/delete controls
                 return (
-                  <TableCell key={`h-${i}`} sx={{ minWidth: 180, p: '4px 8px' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <th key={`h-${i}`} className="px-2 py-1 min-w-[180px] relative">
+                    <div className="flex items-center gap-1">
                       {ax && (
-                        <Chip
-                          label={KIND_LABEL[ax.kind]}
-                          size="small"
-                          color={KIND_COLOR[ax.kind]}
-                          sx={{ height: 18, fontSize: 10, flexShrink: 0 }}
-                        />
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0', KIND_BADGE[ax.kind])}>
+                          {KIND_LABEL[ax.kind]}
+                        </span>
                       )}
-                      <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 700, flex: 1, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
-                        onClick={(e) => setAxisMenu({ anchor: e.currentTarget as HTMLElement, axisIdx: i })}
+                      <span
+                        className="text-xs font-bold flex-1 cursor-pointer hover:text-blue-200 truncate"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAxisMenu((prev) => prev?.axisIdx === i ? null : { axisIdx: i });
+                        }}
                       >
                         {h}
-                      </Typography>
-                      <Tooltip title="Change variable">
-                        <IconButton
-                          size="small"
-                          sx={{ width: 20, height: 20 }}
-                          onClick={(e) => setAxisMenu({ anchor: e.currentTarget, axisIdx: i })}
+                      </span>
+                      <button
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 text-white/80"
+                        onClick={(e) => { e.stopPropagation(); setAxisMenu((prev) => prev?.axisIdx === i ? null : { axisIdx: i }); }}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-red-400/30 text-white/80 hover:text-white"
+                        onClick={() => onAxisDelete?.(i)}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+
+                      {/* Axis variable dropdown */}
+                      {axisMenu?.axisIdx === i && (
+                        <div
+                          ref={menuRef}
+                          className="absolute top-full left-0 z-50 mt-1 min-w-[260px] bg-white border border-slate-200 rounded-xl shadow-lg py-1"
                         >
-                          <EditRoundedIcon sx={{ fontSize: 12 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Remove this axis">
-                        <IconButton
-                          size="small"
-                          sx={{ width: 20, height: 20, '&:hover': { color: 'error.main' } }}
-                          onClick={() => onAxisDelete?.(i)}
-                        >
-                          <CloseRoundedIcon sx={{ fontSize: 12 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
+                          <div className="px-3 py-1.5 border-b border-slate-100">
+                            <span className="text-xs font-semibold text-slate-500">
+                              {ax ? `Swap to another ${KIND_LABEL[ax.kind]} variable` : ''}
+                            </span>
+                          </div>
+                          {changeCompatibleVars.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-slate-400">No variables available</div>
+                          ) : (
+                            changeCompatibleVars.map((v) => (
+                              <button
+                                key={v.gid}
+                                className={cn(
+                                  'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-slate-50 transition-colors',
+                                  axisMenu && editingAxes?.[axisMenu.axisIdx]?.variableName === v.name ? 'bg-blue-50' : '',
+                                )}
+                                onClick={() => {
+                                  if (axisMenu) onAxisVariableChange?.(axisMenu.axisIdx, v.name, v.kind);
+                                  setAxisMenu(null);
+                                }}
+                              >
+                                <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold min-w-[68px] text-center', KIND_BADGE[v.kind])}>
+                                  {KIND_LABEL[v.kind]}
+                                </span>
+                                <span className="text-slate-700">{v.name}</span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 );
               })}
 
-              {/* Add axis button column */}
               {editable && (
-                <TableCell sx={{ width: 44, p: '4px' }}>
+                <th className="w-11 px-1 py-1 text-center">
                   <Tooltip title="Add axis">
-                    <IconButton size="small" onClick={() => onAddAxis?.()}>
-                      <AddRoundedIcon fontSize="small" />
-                    </IconButton>
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/20 text-white/80 hover:text-white mx-auto"
+                      onClick={() => onAddAxis?.()}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </Tooltip>
-                </TableCell>
+                </th>
               )}
 
-              {/* Row-delete column header (spacer) */}
-              {editable && <TableCell sx={{ width: 40 }} />}
-            </StyledTableHeadRow>
-          </TableHead>
+              {editable && <th className="w-10" />}
+            </tr>
+          </thead>
 
-          <TableBody>
+          <tbody>
             {table.rows.map((row, r) => (
-              <TableRow key={`r-${r}`} hover>
-                <TableCell sx={{ color: 'text.secondary' }}>{r + 1}</TableCell>
+              <tr key={`r-${r}`} className="hover:bg-slate-50 border-b border-slate-100">
+                <td className="px-3 py-2 text-xs text-slate-400 font-tabular">{r + 1}</td>
                 {table.headers.map((_, c) => (
-                  <TableCell key={`c-${r}-${c}`} sx={editable ? { p: 0 } : undefined}>
+                  <td key={`c-${r}-${c}`} className={editable ? 'p-0' : 'px-3 py-2 text-sm text-slate-700'}>
                     {editable ? (
                       <EditableGridCell value={row[c] ?? ''} onChange={(v) => onCellChange?.(r, c, v)} />
                     ) : (
                       row[c] ?? ''
                     )}
-                  </TableCell>
+                  </td>
                 ))}
-                {editable && <TableCell />}
+                {editable && <td />}
                 {editable && (
-                  <TableCell sx={{ p: '2px 4px' }}>
+                  <td className="px-1 py-1">
                     <Tooltip title="Delete row">
-                      <IconButton
-                        size="small"
-                        sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                      <button
+                        className="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-red-500 hover:bg-red-50"
                         onClick={() => onDeleteRow?.(r)}
                       >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </Tooltip>
-                  </TableCell>
+                  </td>
                 )}
-              </TableRow>
+              </tr>
             ))}
 
             {editable && (
-              <TableRow>
-                <TableCell colSpan={table.headers.length + extraCols + 1} sx={{ py: 0.5, px: 1 }}>
-                  <Box
-                    component="button"
+              <tr>
+                <td colSpan={table.headers.length + extraCols + 1} className="px-2 py-1">
+                  <button
                     onClick={onAddRow}
-                    sx={{
-                      display: 'flex', alignItems: 'center', gap: 0.5,
-                      border: 'none', background: 'none', cursor: 'pointer',
-                      color: 'text.secondary', fontSize: '0.75rem', fontFamily: 'inherit',
-                      px: 1, py: 0.5, borderRadius: 1,
-                      '&:hover': { bgcolor: 'action.hover', color: 'primary.main' },
-                    }}
+                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-primary-600 hover:bg-slate-50 px-2 py-1 rounded transition-colors"
                   >
-                    <AddRoundedIcon sx={{ fontSize: 14 }} />
+                    <Plus className="w-3.5 h-3.5" />
                     Add row
-                  </Box>
-                </TableCell>
-              </TableRow>
+                  </button>
+                </td>
+              </tr>
             )}
 
             {table.rows.length === 0 && !editable && (
-              <TableRow>
-                <TableCell colSpan={table.headers.length + 1} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+              <tr>
+                <td colSpan={table.headers.length + 1} className="px-3 py-8 text-center text-sm text-slate-400">
                   No data rows in this sheet.
-                </TableCell>
-              </TableRow>
+                </td>
+              </tr>
             )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Change variable menu — for already-assigned axes (same-kind swap) */}
-      <Menu
-        anchorEl={axisMenu?.anchor ?? null}
-        open={!!axisMenu}
-        onClose={() => setAxisMenu(null)}
-        slotProps={{ paper: { sx: { minWidth: 260 } } }}
-      >
-        <MenuItem disabled sx={{ opacity: '1 !important' }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-            {axisMenu && editingAxes?.[axisMenu.axisIdx]
-              ? `Swap to another ${KIND_LABEL[editingAxes[axisMenu.axisIdx].kind]} variable`
-              : ''}
-          </Typography>
-        </MenuItem>
-        {changeCompatibleVars.length === 0 ? (
-          <MenuItem disabled>No variables available</MenuItem>
-        ) : (
-          changeCompatibleVars.map((v) => (
-            <MenuItem
-              key={v.gid}
-              selected={axisMenu ? editingAxes?.[axisMenu.axisIdx]?.variableName === v.name : false}
-              onClick={() => {
-                if (axisMenu) onAxisVariableChange?.(axisMenu.axisIdx, v.name, v.kind);
-                setAxisMenu(null);
-              }}
-            >
-              <Chip
-                label={KIND_LABEL[v.kind]}
-                size="small"
-                color={KIND_COLOR[v.kind]}
-                sx={{ height: 18, fontSize: 10, mr: 1, minWidth: 68 }}
-              />
-              <ListItemText primary={v.name} />
-            </MenuItem>
-          ))
-        )}
-      </Menu>
-    </SurfaceCard>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 
@@ -1126,27 +1094,21 @@ const EditableGridCell = ({ value, onChange }: EditableGridCellProps) => {
   };
 
   return (
-    <Box
-      component="input"
+    <input
       value={draft}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.value)}
+      onChange={(e) => setDraft(e.target.value)}
       onFocus={() => setFocused(true)}
-      onBlur={(e: React.FocusEvent<HTMLInputElement>) => { setFocused(false); commit(e.target.value); }}
-      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+      onBlur={(e) => { setFocused(false); commit(e.target.value); }}
+      onKeyDown={(e) => {
         if (e.key === 'Enter') { commit(draft); (e.target as HTMLInputElement).blur(); }
         if (e.key === 'Escape') { setDraft(value); (e.target as HTMLInputElement).blur(); }
       }}
-      sx={{
-        display: 'block', width: '100%', minWidth: 80, px: 1, py: 0.75,
-        border: 'none',
-        outline: focused ? '2px solid' : 'none',
-        outlineColor: 'warning.main',
-        outlineOffset: '-2px',
-        background: focused ? 'rgba(245,158,11,0.08)' : 'transparent',
-        fontSize: '0.8125rem', fontFamily: 'inherit', color: 'inherit',
-        cursor: 'text', boxSizing: 'border-box', transition: 'background 100ms ease',
-        '&:hover': { background: focused ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.04)' },
-      }}
+      className={cn(
+        'block w-full min-w-[80px] px-2 py-1.5 border-0 outline-none text-xs font-tabular cursor-text box-border transition-colors',
+        focused
+          ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/80'
+          : 'bg-transparent hover:bg-amber-50/40',
+      )}
     />
   );
 };

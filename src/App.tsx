@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Box, Typography } from '@mui/material';
 import AppLayout from './components/layout/AppLayout';
 import ConfirmDialog from './components/common/ConfirmDialog';
 import ScheduleList from './screens/ScheduleList';
@@ -17,17 +16,12 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
 };
 
 const Placeholder = ({ label }: { label: string }) => (
-  <Box sx={{ p: { xs: 3, md: 6 }, textAlign: 'center' }}>
-    <Typography variant="h5" color="text.secondary" sx={{ mt: 6 }}>
-      {label}
-    </Typography>
-    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-      This section is coming soon.
-    </Typography>
-  </Box>
+  <div className="p-12 text-center">
+    <h2 className="text-xl font-semibold text-slate-400 mt-12">{label}</h2>
+    <p className="text-sm text-slate-400 mt-1">This section is coming soon.</p>
+  </div>
 );
 
-// 'wizard' covers both flows: creating a new schedule and resuming an existing one.
 type ScheduleMode = 'list' | 'wizard';
 
 const CLASSIFY_LEAVE_MESSAGE =
@@ -38,9 +32,7 @@ function App() {
   const [mode, setMode] = useState<ScheduleMode>('list');
   const [selectedSchedule, setSelectedSchedule] = useState<PcScheduleDto | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  // True while the wizard's AI classification is running — guards side navigation.
   const [classifying, setClassifying] = useState(false);
-  // Nav key deferred until the user confirms the "leave while classifying" popup.
   const [pendingNavKey, setPendingNavKey] = useState<string | null>(null);
 
   const meta = useMemo(() => {
@@ -49,14 +41,11 @@ function App() {
       return selectedSchedule
         ? {
             title: `Schedule ${selectedSchedule.scheduleId}`,
-            subtitle:
-              selectedSchedule.description ||
-              'Rate table, variables & methodologies',
+            subtitle: selectedSchedule.description || 'Rate table, variables & methodologies',
           }
         : {
             title: 'New PC Schedule',
-            subtitle:
-              'Guided setup: schedule, rate table, variables, methodologies',
+            subtitle: 'Guided setup: schedule, rate table, variables, methodologies',
           };
     }
     return TITLES.schedules;
@@ -70,7 +59,6 @@ function App() {
   };
 
   const handleSelectNav = (key: string) => {
-    // Defer navigation behind the confirm popup while the AI classification runs.
     if (classifying) {
       setPendingNavKey(key);
       return;

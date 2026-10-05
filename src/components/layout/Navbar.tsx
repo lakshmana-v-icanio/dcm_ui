@@ -1,51 +1,22 @@
-import {
-  AppBar,
-  Box,
-  Divider,
-  Toolbar,
-  Typography,
-} from '@mui/material';
-
 interface NavbarProps {
   title: string;
   subtitle?: string;
   sidebarWidth: number;
 }
 
-const Navbar = ({ title, subtitle, sidebarWidth }: NavbarProps) => {
-  return (
-    <AppBar
-      position="fixed"
-      elevation={0}
-      sx={{
-        width: `calc(100% - ${sidebarWidth}px)`,
-        ml: `${sidebarWidth}px`,
-        transition: 'width 220ms ease, margin 220ms ease',
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Toolbar sx={{ minHeight: 64, gap: 2 }}>
-        <Box>
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, lineHeight: 1.15, fontSize: '1rem' }}
-          >
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1 }}>
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-        <Box sx={{ flex: 1 }} />
-      </Toolbar>
-      <Divider />
-    </AppBar>
-  );
-};
+const Navbar = ({ title, subtitle, sidebarWidth }: NavbarProps) => (
+  <header
+    className="fixed top-0 right-0 h-16 bg-white border-b border-slate-200 z-30 flex items-center transition-all duration-200 ease-in-out"
+    style={{ left: sidebarWidth }}
+  >
+    <div className="flex items-center gap-3 px-6 h-full w-full">
+      <div>
+        <h1 className="text-base font-bold text-slate-900 leading-tight">{title}</h1>
+        {subtitle && <p className="text-xs text-slate-500 leading-tight mt-0.5">{subtitle}</p>}
+      </div>
+      <div className="flex-1" />
+    </div>
+  </header>
+);
 
 export default Navbar;

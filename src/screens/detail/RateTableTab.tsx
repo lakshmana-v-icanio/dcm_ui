@@ -1,21 +1,10 @@
 import { useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  IconButton,
-  Paper,
-  Snackbar,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import UploadRoundedIcon from '@mui/icons-material/UploadRounded';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
-import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded';
-import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
-import CircularProgress from '@mui/material/CircularProgress';
+import { Plus, Upload, Trash2, GripVertical, ArrowRight } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
+import { Alert } from '../../components/ui/Alert';
+import { Snackbar } from '../../components/ui/Snackbar';
+import { Spinner } from '../../components/ui/Spinner';
+import { cn } from '../../lib/cn';
 
 interface RateTable {
   id: string;
@@ -24,9 +13,7 @@ interface RateTable {
   endDate: string;
   cols: number;
   rows: number;
-  /** rows × cols string grid — sparse rows OK, undefined cell = empty */
   cells: string[][];
-  /** Column header labels — used as AI classification field names */
   headers: string[];
 }
 
@@ -37,10 +24,7 @@ const END_OF_TIME = '2300-01-01';
 
 const emptyGrid = (rows: number, cols: number): string[][] =>
   Array.from({ length: rows }, () => Array.from({ length: cols }, () => ''));
-
-const defaultHeaders = (cols: number): string[] =>
-  Array.from({ length: cols }, () => '');
-
+const defaultHeaders = (cols: number): string[] => Array.from({ length: cols }, () => '');
 const makeRateTable = (index: number): RateTable => ({
   id: `rt-${Date.now()}-${index}`,
   name: `New Rate Table ${index}`,
@@ -86,84 +70,45 @@ const RateTableTab = ({ onNext, nextLoading = false }: RateTableTabProps) => {
     });
   };
 
-  const updateActive = (patch: Partial<RateTable>) => {
+  const updateActive = (patch: Partial<RateTable>) =>
     setTables((prev) => prev.map((t) => (t.id === activeId ? { ...t, ...patch } : t)));
-  };
 
   const addColumn = () => {
-    const newCells = active.cells.map((r) => [...r, '']);
-    const nextHeaders = [...active.headers, ''];
-    updateActive({ cols: active.cols + 1, cells: newCells, headers: nextHeaders });
+    updateActive({ cols: active.cols + 1, cells: active.cells.map((r) => [...r, '']), headers: [...active.headers, ''] });
   };
   const addRows = () => {
-    const extra = Array.from({ length: ADD_ROWS_STEP }, () =>
-      Array.from({ length: active.cols }, () => ''),
-    );
+    const extra = Array.from({ length: ADD_ROWS_STEP }, () => Array.from({ length: active.cols }, () => ''));
     updateActive({ rows: active.rows + ADD_ROWS_STEP, cells: [...active.cells, ...extra] });
   };
 
   const setHeader = (col: number, value: string) => {
-    const next = [...active.headers];
-    next[col] = value;
-    updateActive({ headers: next });
+    const next = [...active.headers]; next[col] = value; updateActive({ headers: next });
   };
 
   const handleNext = () => {
     if (!onNext) return;
     const headers = active.headers;
     const cellAt = (r: number, c: number) => (active.cells?.[r]?.[c] ?? '').trim();
-
-    // 1. Identify columns that actually contain data anywhere in the grid.
     const activeCols: number[] = [];
     for (let c = 0; c < active.cols; c++) {
-      let colHasAny = false;
-      for (let r = 0; r < active.rows; r++) {
-        if (cellAt(r, c) !== '') { colHasAny = true; break; }
-      }
-      if (colHasAny) activeCols.push(c);
+      for (let r = 0; r < active.rows; r++) { if (cellAt(r, c) !== '') { activeCols.push(c); break; } }
     }
-
-    if (activeCols.length === 0) {
-      setToast('Add at least one filled cell before continuing');
-      return;
-    }
-
-    // 2. Detect pivot / matrix layout.
-    //    Signature: row 1 col A has a label, row 1 in every other active column is empty,
-    //    and at least one later row in col A has data.
+    if (activeCols.length === 0) { setToast('Add at least one filled cell before continuing'); return; }
     const [labelCol, ...valueCols] = activeCols;
     const rowDimNameCell = cellAt(0, labelCol);
-    const row1OtherColsEmpty =
-      valueCols.length > 0 &&
-      valueCols.every((c) => cellAt(0, c) === '');
+    const row1OtherColsEmpty = valueCols.length > 0 && valueCols.every((c) => cellAt(0, c) === '');
     let laterRowsInLabelColHaveData = false;
-    for (let r = 1; r < active.rows; r++) {
-      if (cellAt(r, labelCol) !== '') { laterRowsInLabelColHaveData = true; break; }
-    }
-    const isPivot =
-      rowDimNameCell !== '' &&
-      row1OtherColsEmpty &&
-      laterRowsInLabelColHaveData &&
-      valueCols.length >= 1;
-
+    for (let r = 1; r < active.rows; r++) { if (cellAt(r, labelCol) !== '') { laterRowsInLabelColHaveData = true; break; } }
+    const isPivot = rowDimNameCell !== '' && row1OtherColsEmpty && laterRowsInLabelColHaveData && valueCols.length >= 1;
     const rows: Record<string, string>[] = [];
-
     if (isPivot) {
-      // Pivot mode — mirror legacy matrix rate-table editors.
-      //   headers[labelCol]        → column-dimension NAME  (e.g. "MOverride")
-      //   headers[valueCols[i]]    → column-dimension VALUE (e.g. "Special Producer")
-      //   cellAt(0, labelCol)       → row-dimension NAME    (e.g. "TargetLevel")
-      //   cellAt(r>=1, labelCol)    → row-dimension VALUE   (e.g. "[1,2)")
-      //   cellAt(r>=1, valueCol)    → Value                 (the rate)
       const rowDimName = rowDimNameCell;
       const colDimName = (headers[labelCol] ?? '').trim();
-
       for (let r = 1; r < active.rows; r++) {
         const rowVal = cellAt(r, labelCol);
         if (rowVal === '') continue;
         for (const c of valueCols) {
-          const val = cellAt(r, c);
-          if (val === '') continue;
+          const val = cellAt(r, c); if (val === '') continue;
           const colVal = (headers[c] ?? '').trim();
           const entry: Record<string, string> = { [rowDimName]: rowVal, Value: val };
           if (colDimName !== '') entry[colDimName] = colVal;
@@ -171,71 +116,36 @@ const RateTableTab = ({ onNext, nextLoading = false }: RateTableTabProps) => {
         }
       }
     } else {
-      // Flat mode — one JSON row per grid row using column headers as keys.
-      // Columns without a header are simply skipped in the payload.
       for (let r = 0; r < active.rows; r++) {
-        const row: Record<string, string> = {};
-        let rowHasAny = false;
+        const row: Record<string, string> = {}; let rowHasAny = false;
         for (const c of activeCols) {
-          const val = cellAt(r, c);
-          if (val !== '') rowHasAny = true;
-          const key = (headers[c] ?? '').trim();
-          if (key !== '') row[key] = val;
+          const val = cellAt(r, c); if (val !== '') rowHasAny = true;
+          const key = (headers[c] ?? '').trim(); if (key !== '') row[key] = val;
         }
         if (rowHasAny) rows.push(row);
       }
     }
-
-    if (rows.length === 0) {
-      setToast('Add at least one filled cell before continuing');
-      return;
-    }
+    if (rows.length === 0) { setToast('Add at least one filled cell before continuing'); return; }
     onNext(rows);
   };
 
-  /* ---------------- CSV upload ----------------------------------------- */
-
-  /**
-   * Standards-compliant CSV parser — handles quoted fields, commas inside quotes,
-   * escaped double-quotes ("") and either \n or \r\n line endings. Trailing empty
-   * line is stripped.
-   */
   const parseCsv = (text: string): string[][] => {
     const rows: string[][] = [];
-    let current: string[] = [];
-    let field = '';
-    let inQuotes = false;
+    let current: string[] = []; let field = ''; let inQuotes = false;
     for (let i = 0; i < text.length; i++) {
       const ch = text[i];
       if (inQuotes) {
-        if (ch === '"') {
-          if (text[i + 1] === '"') { field += '"'; i++; }
-          else                     { inQuotes = false; }
-        } else {
-          field += ch;
-        }
+        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; } }
+        else { field += ch; }
       } else {
-        if (ch === '"')      { inQuotes = true; }
+        if (ch === '"') { inQuotes = true; }
         else if (ch === ',') { current.push(field); field = ''; }
-        else if (ch === '\r') {
-          // \r\n normalised
-        }
-        else if (ch === '\n') {
-          current.push(field);
-          rows.push(current);
-          current = [];
-          field = '';
-        } else {
-          field += ch;
-        }
+        else if (ch === '\r') { /* skip */ }
+        else if (ch === '\n') { current.push(field); rows.push(current); current = []; field = ''; }
+        else { field += ch; }
       }
     }
-    // Flush trailing field / row
-    if (field !== '' || current.length > 0) {
-      current.push(field);
-      rows.push(current);
-    }
-    // Drop a completely empty trailing row (from a final newline)
+    if (field !== '' || current.length > 0) { current.push(field); rows.push(current); }
     if (rows.length > 0 && rows[rows.length - 1].every((v) => v === '')) rows.pop();
     return rows;
   };
@@ -243,111 +153,67 @@ const RateTableTab = ({ onNext, nextLoading = false }: RateTableTabProps) => {
   const handleUploadClick = () => fileInputRef.current?.click();
 
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-uploading the same file
+    const file = e.target.files?.[0]; e.target.value = '';
     if (!file) return;
     try {
       const text = await file.text();
       const grid = parseCsv(text);
-      if (grid.length === 0) {
-        setToast('CSV appears to be empty');
-        return;
-      }
+      if (grid.length === 0) { setToast('CSV appears to be empty'); return; }
       const [headerRow, ...dataRows] = grid;
       const cols = headerRow.length;
       const rowsCount = Math.max(dataRows.length, DEFAULT_ROWS);
-      // Normalise each data row to `cols` width
       const cells: string[][] = [];
       for (let r = 0; r < rowsCount; r++) {
-        const src = dataRows[r] ?? [];
-        const row: string[] = [];
+        const src = dataRows[r] ?? []; const row: string[] = [];
         for (let c = 0; c < cols; c++) row.push((src[c] ?? '').trim());
         cells.push(row);
       }
-      // Keep headers exactly as they appear in the CSV — including blanks
-      const headers = headerRow.map((h) => (h ?? '').trim());
-      updateActive({ cols, rows: rowsCount, headers, cells });
+      updateActive({ cols, rows: rowsCount, headers: headerRow.map((h) => (h ?? '').trim()), cells });
       setFocused(null);
       setToast(`Loaded ${dataRows.length} row(s) × ${cols} column(s) from ${file.name}`);
-    } catch (err: unknown) {
-      const message = (err as { message?: string }).message ?? 'Failed to read CSV';
-      setToast(message);
-    }
+    } catch (err: unknown) { setToast((err as { message?: string }).message ?? 'Failed to read CSV'); }
   };
 
   const setCell = (row: number, col: number, value: string) => {
     const nextCells = active.cells.map((r) => [...r]);
-    // Guard against sparse arrays after resizes
     while (nextCells.length < active.rows) nextCells.push([]);
     while (nextCells[row].length < active.cols) nextCells[row].push('');
     nextCells[row][col] = value;
     updateActive({ cells: nextCells });
   };
 
-  const getCell = (row: number, col: number): string =>
-    active.cells?.[row]?.[col] ?? '';
-
-  /* ---------------- Copy / paste — spreadsheet-style ------------------- */
+  const getCell = (row: number, col: number): string => active.cells?.[row]?.[col] ?? '';
 
   const parseClipboardGrid = (text: string): string[][] => {
-    // Strip a single trailing newline (Excel adds one) then split on \r?\n and \t
     const trimmed = text.replace(/\r?\n$/, '');
     return trimmed.split(/\r?\n/).map((line) => line.split('\t'));
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     if (!focused) return;
-    // If a cell input is actively being edited, let it handle its own paste.
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-
-    const raw = e.clipboardData.getData('text');
-    if (!raw) return;
-    const grid = parseClipboardGrid(raw);
-    if (grid.length === 0) return;
+    const raw = e.clipboardData.getData('text'); if (!raw) return;
+    const grid = parseClipboardGrid(raw); if (grid.length === 0) return;
     e.preventDefault();
-
-    const startRow = focused.row;
-    const startCol = focused.col;
+    const startRow = focused.row; const startCol = focused.col;
     const rowsNeeded = startRow + grid.length;
     const colsNeeded = startCol + Math.max(...grid.map((r) => r.length));
-
-    // Grow the current cells matrix as needed
     const nextCells: string[][] = active.cells.map((r) => [...r]);
-    while (nextCells.length < rowsNeeded) {
-      nextCells.push(Array.from({ length: active.cols }, () => ''));
-    }
+    while (nextCells.length < rowsNeeded) nextCells.push(Array.from({ length: active.cols }, () => ''));
     for (let r = 0; r < nextCells.length; r++) {
       while (nextCells[r].length < Math.max(active.cols, colsNeeded)) nextCells[r].push('');
     }
-    // Write clipboard into place
     for (let r = 0; r < grid.length; r++) {
-      for (let c = 0; c < grid[r].length; c++) {
-        nextCells[startRow + r][startCol + c] = grid[r][c];
-      }
+      for (let c = 0; c < grid[r].length; c++) { nextCells[startRow + r][startCol + c] = grid[r][c]; }
     }
-
-    // Grow headers to cover any new columns
     const nextHeaders = [...active.headers];
     while (nextHeaders.length < colsNeeded) {
-      // Insert new "Column N" before the trailing "Value" if it exists
       const lastIdx = nextHeaders.length - 1;
-      if (
-        nextHeaders.length > 0 &&
-        nextHeaders[lastIdx] === 'Value'
-      ) {
-        nextHeaders.splice(lastIdx, 0, `Column ${nextHeaders.length}`);
-      } else {
-        nextHeaders.push(nextHeaders.length === colsNeeded - 1 ? 'Value' : `Column ${nextHeaders.length + 1}`);
-      }
+      if (nextHeaders.length > 0 && nextHeaders[lastIdx] === 'Value') { nextHeaders.splice(lastIdx, 0, `Column ${nextHeaders.length}`); }
+      else { nextHeaders.push(nextHeaders.length === colsNeeded - 1 ? 'Value' : `Column ${nextHeaders.length + 1}`); }
     }
-
-    updateActive({
-      rows:    Math.max(active.rows, rowsNeeded),
-      cols:    Math.max(active.cols, colsNeeded),
-      cells:   nextCells,
-      headers: nextHeaders,
-    });
+    updateActive({ rows: Math.max(active.rows, rowsNeeded), cols: Math.max(active.cols, colsNeeded), cells: nextCells, headers: nextHeaders });
     setToast(`Pasted ${grid.length} row(s) × ${grid[0]?.length ?? 0} col(s)`);
   };
 
@@ -356,222 +222,101 @@ const RateTableTab = ({ onNext, nextLoading = false }: RateTableTabProps) => {
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
     e.preventDefault();
-    const val = getCell(focused.row, focused.col);
-    e.clipboardData.setData('text/plain', val);
+    e.clipboardData.setData('text/plain', getCell(focused.row, focused.col));
   };
 
   return (
-    <Box>
+    <div>
       {/* Toolbar */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-        <Button
-          size="small"
-          startIcon={<AddRoundedIcon />}
-          onClick={addRateTable}
-          sx={{ textTransform: 'none' }}
-        >
-          Add Rate Table
-        </Button>
-        <Button
-          size="small"
-          startIcon={<UploadRoundedIcon />}
-          onClick={handleUploadClick}
-          sx={{ textTransform: 'none' }}
-        >
-          Upload CSV
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          hidden
-          onChange={handleFileChosen}
-        />
-      </Box>
+      <div className="flex gap-2 mb-3">
+        <Button size="small" variant="text" color="primary" startIcon={<Plus className="w-4 h-4" />} onClick={addRateTable}>Add Rate Table</Button>
+        <Button size="small" variant="text" color="primary" startIcon={<Upload className="w-4 h-4" />} onClick={handleUploadClick}>Upload CSV</Button>
+        <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileChosen} />
+      </div>
 
       {/* Tab strip */}
-      <Paper
-        elevation={0}
-        sx={{
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          borderRadius: 2,
-          p: 1.5,
-          mb: 3,
-        }}
-      >
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          Click selected tab to edit name
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+      <div className="border border-slate-200 rounded-xl p-3 mb-4">
+        <p className="text-xs text-slate-500 mb-2">Click selected tab to edit name</p>
+        <div className="flex items-center gap-2 flex-wrap">
           {tables.map((t) => {
             const isActive = t.id === activeId;
             const isRenaming = renamingId === t.id;
             return (
-              <Box
+              <div
                 key={t.id}
-                onClick={() => {
-                  if (isActive && !isRenaming) setRenamingId(t.id);
-                  else setActiveId(t.id);
-                }}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  px: 1.5,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: isActive ? 'primary.main' : 'rgba(15, 23, 42, 0.12)',
-                  background: isActive ? 'rgba(79, 70, 229, 0.06)' : '#fff',
-                  color: isActive ? 'primary.main' : 'text.primary',
-                  fontWeight: isActive ? 700 : 500,
-                  transition: 'all 120ms ease',
-                }}
+                onClick={() => { if (isActive && !isRenaming) setRenamingId(t.id); else setActiveId(t.id); }}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer border text-sm font-medium transition-all',
+                  isActive ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                )}
               >
                 {isRenaming ? (
-                  <TextField
+                  <input
                     autoFocus
-                    size="small"
                     value={t.name}
-                    onChange={(e) =>
-                      setTables((prev) =>
-                        prev.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)),
-                      )
-                    }
+                    onChange={(e) => setTables((prev) => prev.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)))}
                     onBlur={() => setRenamingId(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === 'Escape') setRenamingId(null);
-                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setRenamingId(null); }}
                     onClick={(e) => e.stopPropagation()}
-                    variant="standard"
-                    sx={{ minWidth: 140, '& .MuiInputBase-input': { fontSize: 14, py: 0 } }}
+                    className="text-sm border-none outline-none bg-transparent min-w-[120px] w-full"
                   />
                 ) : (
-                  <span style={{ fontSize: 14 }}>{t.name}</span>
+                  <span>{t.name}</span>
                 )}
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteRateTable(t.id);
-                  }}
-                  sx={{
-                    width: 20,
-                    height: 20,
-                    color: isActive ? 'primary.main' : 'text.disabled',
-                    '&:hover': { color: 'error.main' },
-                  }}
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteRateTable(t.id); }}
+                  className={cn('p-0.5 rounded transition-colors', isActive ? 'text-primary-400 hover:text-error-600' : 'text-slate-400 hover:text-error-600')}
                 >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Box>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             );
           })}
-
-          <Box sx={{ flex: 1 }} />
-          <Tooltip title="Reorder (coming soon)">
-            <IconButton size="small" sx={{ color: 'text.disabled' }}>
-              <DragIndicatorRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Paper>
+          <div className="flex-1" />
+          <button className="p-1.5 text-slate-300 rounded" title="Reorder (coming soon)">
+            <GripVertical className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* Start / End dates */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 3,
-          mb: 3,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, minWidth: 200 }}>
-          Rate Table Start and End Date:
-        </Typography>
-        <TextField
-          type="date"
-          label="Start Date"
-          size="small"
-          value={active.startDate}
-          onChange={(e) => updateActive({ startDate: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          type="date"
-          label="End Date"
-          size="small"
-          value={active.endDate}
-          onChange={(e) => updateActive({ endDate: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-      </Box>
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
+        <span className="text-sm font-bold text-slate-700 min-w-[200px]">Rate Table Start and End Date:</span>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-xs font-medium text-slate-700">Start Date</label>
+          <input type="date" className="border border-slate-300 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600" value={active.startDate} onChange={(e) => updateActive({ startDate: e.target.value })} />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <label className="text-xs font-medium text-slate-700">End Date</label>
+          <input type="date" className="border border-slate-300 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600" value={active.endDate} onChange={(e) => updateActive({ endDate: e.target.value })} />
+        </div>
+      </div>
 
-      {/* Grid — Paper is tabIndex-able so paste events fire even without an input focus */}
-      <Paper
-        elevation={0}
+      {/* Grid */}
+      <div
+        className="border border-slate-200 rounded-xl overflow-hidden outline-none"
         tabIndex={0}
         onPaste={handlePaste}
         onCopy={handleCopy}
-        sx={{
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          borderRadius: 2,
-          overflow: 'hidden',
-          outline: 'none',
-        }}
       >
-        <Box sx={{ position: 'relative' }}>
-          {/* Add column button */}
-          <Button
-            size="small"
-            startIcon={<AddRoundedIcon fontSize="inherit" />}
+        <div className="relative">
+          <button
             onClick={addColumn}
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              zIndex: 2,
-              textTransform: 'none',
-              fontSize: 12,
-              minHeight: 28,
-              borderRadius: 4,
-              px: 1.25,
-              py: 0.25,
-              color: 'primary.main',
-              bgcolor: '#fff',
-              border: '1px solid',
-              borderColor: 'primary.light',
-              '&:hover': { bgcolor: 'primary.50', borderColor: 'primary.main' },
-            }}
+            className="absolute top-2 right-2 z-10 text-xs px-2 py-1 border border-primary-200 bg-white text-primary-600 rounded-full hover:bg-primary-50 hover:border-primary-600 transition-colors"
           >
-            1 col
-          </Button>
-
-          <Box sx={{ overflowX: 'auto' }}>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: `56px repeat(${active.cols}, minmax(180px, 1fr))`,
-                minWidth: 900,
-              }}
-            >
-              {/* Column header row */}
-              <Box sx={cellHeaderCornerSx} />
+            + 1 col
+          </button>
+          <div className="overflow-x-auto scrollbar-thin">
+            <div className="grid min-w-[900px]" style={{ gridTemplateColumns: `56px repeat(${active.cols}, minmax(180px, 1fr))` }}>
+              {/* Header row */}
+              <div className="h-10 bg-white border-b border-r border-slate-100" />
               {Array.from({ length: active.cols }, (_, i) => (
-                <HeaderCell
-                  key={`col-${active.id}-${i}`}
-                  value={active.headers[i] ?? `Column ${i + 1}`}
-                  onCommit={(v) => setHeader(i, v)}
-                  isLast={i === active.cols - 1}
-                />
+                <HeaderCell key={`col-${active.id}-${i}`} value={active.headers[i] ?? `Column ${i + 1}`} onCommit={(v) => setHeader(i, v)} isLast={i === active.cols - 1} />
               ))}
-
               {/* Body rows */}
               {Array.from({ length: active.rows }, (_, r) => (
-                <Box key={`row-${r}`} sx={{ display: 'contents' }}>
-                  <Box sx={cellRowHeaderSx}>{r + 1}</Box>
+                <div key={`row-${r}`} className="contents">
+                  <div className="h-9 flex items-center justify-center text-xs font-medium text-slate-400 bg-white border-b border-r border-slate-100">{r + 1}</div>
                   {Array.from({ length: active.cols }, (_, c) => (
                     <EditableCell
                       key={`cell-${active.id}-${r}-${c}`}
@@ -582,302 +327,89 @@ const RateTableTab = ({ onNext, nextLoading = false }: RateTableTabProps) => {
                       onFocus={() => setFocused({ row: r, col: c })}
                     />
                   ))}
-                </Box>
+                </div>
               ))}
-            </Box>
-          </Box>
-        </Box>
-
+            </div>
+          </div>
+        </div>
         {/* Add rows footer */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            px: 1.5,
-            py: 1,
-            borderTop: '1px solid rgba(15, 23, 42, 0.06)',
-            background: 'rgba(15, 23, 42, 0.02)',
-          }}
-        >
-          <Button
-            size="small"
-            startIcon={<AddRoundedIcon fontSize="inherit" />}
+        <div className="flex items-center px-3 py-2 border-t border-slate-100 bg-slate-50">
+          <button
             onClick={addRows}
-            sx={{
-              textTransform: 'none',
-              fontSize: 12,
-              borderRadius: 4,
-              px: 1.5,
-              color: 'primary.main',
-              border: '1px solid',
-              borderColor: 'primary.light',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'primary.50' },
-            }}
+            className="text-xs px-3 py-1 border border-primary-200 text-primary-600 rounded-full hover:bg-primary-50 hover:border-primary-600 transition-colors"
           >
-            {ADD_ROWS_STEP} rows
-          </Button>
-        </Box>
-      </Paper>
+            + {ADD_ROWS_STEP} rows
+          </button>
+        </div>
+      </div>
 
-      {/* Next → Variables */}
+      {/* Next button */}
       {onNext && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+        <div className="flex justify-end mt-4">
           <Button
             variant="contained"
+            color="primary"
             size="large"
             disabled={nextLoading}
-            endIcon={
-              nextLoading ? (
-                <CircularProgress size={18} color="inherit" />
-              ) : (
-                <ArrowForwardRoundedIcon />
-              )
-            }
+            endIcon={nextLoading ? <Spinner size={16} color="white" /> : <ArrowRight className="w-4 h-4" />}
             onClick={handleNext}
-            sx={{
-              background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-              minWidth: 200,
-            }}
           >
             {nextLoading ? 'Classifying…' : 'Next'}
           </Button>
-        </Box>
+        </div>
       )}
 
-      <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
-        Rate tables are stored locally for now — hooking to
-        <code style={{ margin: '0 4px' }}>POST /pc/schedules/&#123;id&#125;/rate-tables</code>
-        will persist tab structure, dates, columns and rows.
+      <Alert severity="info" className="mt-4">
+        Rate tables are stored locally for now — hooking to <code className="mx-1 text-xs">POST /pc/schedules/{'{id}'}/rate-tables</code> will persist tab structure, dates, columns and rows.
       </Alert>
 
-      <Snackbar
-        open={!!toast}
-        autoHideDuration={2500}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={() => setToast(null)} severity="info" variant="filled" sx={{ borderRadius: 2 }}>
-          {toast}
-        </Alert>
+      <Snackbar open={!!toast} onClose={() => setToast(null)} autoHideDuration={2500} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert severity="info" variant="filled" onClose={() => setToast(null)}>{toast}</Alert>
       </Snackbar>
-    </Box>
+    </div>
   );
 };
 
-/* ------------------------------------------------------------------------- */
-/*  HeaderCell — editable column header                                       */
-/* ------------------------------------------------------------------------- */
-
-interface HeaderCellProps {
-  value: string;
-  onCommit: (value: string) => void;
-  isLast: boolean;
-}
+interface HeaderCellProps { value: string; onCommit: (value: string) => void; isLast: boolean; }
 
 const HeaderCell = ({ value, onCommit, isLast }: HeaderCellProps) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-
-  const commit = () => {
-    const clean = draft.trim();
-    if (clean && clean !== value) onCommit(clean);
-    else setDraft(value);
-    setEditing(false);
-  };
-
+  const commit = () => { const clean = draft.trim(); if (clean && clean !== value) onCommit(clean); else setDraft(value); setEditing(false); };
+  const cellBase = cn('h-10 flex items-center justify-center text-sm font-semibold text-slate-500 bg-white border-b border-slate-100', !isLast && 'border-r');
   if (editing) {
     return (
-      <Box sx={{ ...cellHeaderSx, p: 0, ...(isLast ? { '&': { borderRight: 'none' } } : {}) }}>
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
-            else if (e.key === 'Escape') {
-              setDraft(value);
-              setEditing(false);
-            }
-          }}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: '2px solid #4f46e5',
-            outline: 'none',
-            background: '#fff',
-            padding: '0 8px',
-            fontSize: 13,
-            fontWeight: 700,
-            fontFamily: 'inherit',
-            textAlign: 'center',
-            boxSizing: 'border-box',
-          }}
-        />
-      </Box>
+      <div className={cellBase} style={{ padding: 0 }}>
+        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') { setDraft(value); setEditing(false); } }} className="w-full h-full border-2 border-primary-600 outline-none bg-white px-2 text-sm font-bold text-center" />
+      </div>
     );
   }
-
-  return (
-    <Box
-      onClick={() => setEditing(true)}
-      sx={{
-        ...cellHeaderSx,
-        cursor: 'text',
-        fontWeight: 700,
-        color: 'text.primary',
-        ...(isLast ? { '&': { borderRight: 'none' } } : {}),
-      }}
-    >
-      {value}
-    </Box>
-  );
+  return <div onClick={() => setEditing(true)} className={cn(cellBase, 'cursor-text text-slate-700')}>{value}</div>;
 };
 
-/* ------------------------------------------------------------------------- */
-/*  EditableCell                                                              */
-/* ------------------------------------------------------------------------- */
+interface EditableCellProps { value: string; onCommit: (value: string) => void; isLast: boolean; focused?: boolean; onFocus?: () => void; }
 
-interface EditableCellProps {
-  value: string;
-  onCommit: (value: string) => void;
-  isLast: boolean;
-  focused?: boolean;
-  onFocus?: () => void;
-}
-
-const EditableCell = ({
-  value,
-  onCommit,
-  isLast,
-  focused = false,
-  onFocus,
-}: EditableCellProps) => {
+const EditableCell = ({ value, onCommit, isLast, focused = false, onFocus }: EditableCellProps) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-
-  const commit = () => {
-    if (draft !== value) onCommit(draft);
-    setEditing(false);
-  };
-
-  const cancel = () => {
-    setDraft(value);
-    setEditing(false);
-  };
-
+  const commit = () => { if (draft !== value) onCommit(draft); setEditing(false); };
+  const cancel = () => { setDraft(value); setEditing(false); };
+  const cellBase = cn('h-9 bg-white border-b border-slate-100', !isLast && 'border-r');
   if (editing) {
     return (
-      <Box
-        sx={{
-          ...cellBodySx,
-          p: 0,
-          ...(isLast ? { '&': { borderRight: 'none' } } : {}),
-        }}
-      >
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
-            else if (e.key === 'Escape') cancel();
-          }}
-          style={{
-            width: '100%',
-            height: '100%',
-            border: '2px solid #4f46e5',
-            outline: 'none',
-            background: '#fff',
-            padding: '0 8px',
-            fontSize: 13,
-            fontFamily: 'inherit',
-            color: 'inherit',
-            boxSizing: 'border-box',
-          }}
-        />
-      </Box>
+      <div className={cellBase} style={{ padding: 0 }}>
+        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') cancel(); }} className="w-full h-full border-2 border-primary-600 outline-none bg-white px-2 text-sm" />
+      </div>
     );
   }
-
   return (
-    <Box
-      onClick={() => {
-        onFocus?.();
-        setEditing(true);
-      }}
-      sx={{
-        ...cellBodySx,
-        cursor: 'text',
-        display: 'flex',
-        alignItems: 'center',
-        px: 1,
-        fontSize: 13,
-        color: value ? 'text.primary' : 'text.disabled',
-        // Focused (but not editing) state — visible outline for copy/paste anchor
-        ...(focused
-          ? {
-              '&': {
-                boxShadow: 'inset 0 0 0 2px #4f46e5',
-                background: 'rgba(79, 70, 229, 0.06)',
-              },
-            }
-          : {}),
-        ...(isLast ? { '&': { borderRight: 'none' } } : {}),
-      }}
+    <div
+      onClick={() => { onFocus?.(); setEditing(true); }}
+      className={cn(cellBase, 'flex items-center px-2 text-sm cursor-text hover:bg-primary-50/40 transition-colors', value ? 'text-slate-800' : 'text-slate-300', focused && 'ring-inset ring-2 ring-primary-600 bg-primary-50/40')}
     >
       {value || ''}
-    </Box>
+    </div>
   );
-};
-
-/* ------------------------------------------------------------------------- */
-/*  Cell style presets                                                        */
-/* ------------------------------------------------------------------------- */
-
-const cellHeaderCornerSx = {
-  height: 40,
-  background: '#fff',
-  borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
-  borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-};
-
-const cellHeaderSx = {
-  height: 40,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: 600,
-  fontSize: 13,
-  color: 'text.secondary',
-  background: '#fff',
-  borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
-  borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-  '&:last-of-type': { borderRight: 'none' },
-};
-
-const cellRowHeaderSx = {
-  height: 36,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: 500,
-  fontSize: 12,
-  color: 'text.secondary',
-  background: '#fff',
-  borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-  borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-};
-
-const cellBodySx = {
-  height: 36,
-  background: '#fff',
-  borderBottom: '1px solid rgba(15, 23, 42, 0.05)',
-  borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-  transition: 'background-color 100ms ease',
-  '&:hover': { background: 'rgba(79, 70, 229, 0.04)' },
-  '&:last-of-type': { borderRight: 'none' },
 };
 
 export default RateTableTab;
